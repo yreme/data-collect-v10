@@ -12,6 +12,7 @@
 - 固定镜像 digest，生成 SBOM，扫描依赖漏洞和许可证。
 - 定义版本兼容矩阵、数据库 migration、配置 migration 和一键回滚。
 - 提供部署前检查：MTU、端口、PTP、磁盘、`/dev/shm`、memlock、SDK 设备权限。
+- 在干净主机验证所有源码和配置均来自仓库或固定 digest 镜像，不允许依赖镜像中的未登记 Python 模块。
 - 故障测试不得破坏生产传感器配置，真机破坏性测试需维护窗口。
 
 ## 可用资源
@@ -34,6 +35,7 @@
 - 覆盖 Router/Console/Publisher 重启、A↔D 断链、单设备掉线、慢消费者、磁盘满。
 - 验证 Web 备注持久化、配置 apply/reject/rollback 和审计记录。
 - 对比旧/新路径的 payload、sequence、时间戳、drop 和资源占用。
+- CI 校验所有 Compose、挂载源、Dockerfile、配置路径和端口不冲突。
 - 从新版本回滚后数据读取和配置均恢复，录制文件保持可读。
 
 ## 发布门槛

@@ -26,6 +26,25 @@
 
 ## 2. 能力边界
 
+### 2.0 现有仓库的迁移前置问题
+
+现有 `resource/` 是重要参考，但不是一套可直接启动的完整生产基线。任务 00 开始前必须登记并解决或隔离以下问题：
+
+| 问题 | 当前状态 | 处理要求 |
+|---|---|---|
+| Zenoh 实现 | 仓库中没有 Zenoh 依赖或运行代码 | 先做 Common SDK 与基准，不能直接修改所有驱动 |
+| 生产频率 | `template_prefix_full.yaml` 为 `hz: 2`，现有 `validate_hz()` 只允许 5/10/20/25/40 | 配置 schema 统一合法范围；禁止静默改值 |
+| 配置挂载 | Compose 引用 `../configs/${SENSORS_CONFIG}`，对应目录/文件未入库 | 补齐可运行样例和启动前校验 |
+| GigE 真机驱动 | 仓库 `driver.py` 是灰帧桩，真实 SDK 代码仅可能存在于 base image | 从固定 digest 镜像提取/确认源码与许可证，真机验收不能使用桩 |
+| 隐式依赖 | `sensors_lib.py`、`gige_sync.shm.ring`、`gige_sync.clients.topics` 等不在仓库 | 建立依赖清单；不得依靠未版本化的镜像内部模块 |
+| SHM 命名 | `gige_` 与 `camera_` 两套默认值并存 | 在数据契约中选定唯一 canonical 名称，bridge 显式映射 |
+| SHM 协议 | Publisher 与 Subscriber 存在重复且有差异的 ring 实现 | 先做 golden fixture 兼容测试，再迁移 |
+| 镜像版本 | Compose `.env` 使用 v7.1.0，部分 Dockerfile 仍引用 v6.x | 固定 digest 并输出兼容矩阵 |
+| 设备配置 | lidar1 enabled 状态、IMU UDP/串口方式、Web/Foxglove 端口不一致 | 形成单一 source of truth，环境差异用 overlay 表达 |
+| Docker 路径 | README 引用的部分 compose/Dockerfile 路径与仓库实际目录不同 | CI 中增加路径和 Compose config 校验 |
+
+迁移过程中，`resource/` 保持只读参考属性；确认可复现之前，不把基础镜像内部的代码视为已纳入版本控制。
+
 ### 2.1 Zenoh SHM
 
 - 同主机 Publisher/Subscriber 可以共享大块 payload，跨主机时自动退化为普通网络传输。

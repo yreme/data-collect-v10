@@ -6,6 +6,10 @@
 
 ## 要求
 
+- 先生成现状 inventory：仓库源码、base image 内部模块、配置、端口、镜像 digest 和设备能力；标明哪些内容不可复现。
+- 解决配置冲突：`hz: 2` 与现有频率校验、`gige_`/`camera_` 前缀、lidar1 enabled、IMU UDP/串口和各 Web 端口。
+- 补齐或替换 Compose 引用但未入库的 `configs/`、`sensors_lib.py` 等依赖；启动前禁止从 base image 偶然 import 未声明模块。
+- 对四套旧 SHM magic/ring 建立 golden fixture，确认 Publisher/Subscriber 重复实现是否 wire-compatible。
 - 选择并固定同一 Zenoh Rust/C++/Python/Router 版本及镜像 digest，记录 SHM API 稳定性风险。
 - 定义 `rt/{site}/sensor/...` key、通用消息头、相机/点云/IMU/PLC schema v1。
 - 定义实时、录制、控制、状态四类 QoS；所有队列必须有界。
@@ -25,6 +29,8 @@
 
 ## 交付物
 
+- `docs/current-state-inventory.md`：缺失源码、配置冲突、镜像内部依赖和处理结论。
+- `configs/`：可通过 schema 校验且 Compose 能实际加载的最小 mock 配置。
 - `src/common/schema/` 与 JSON Schema/Protobuf 定义。
 - `benchmarks/zenoh-data-plane/`、一键执行脚本和 JSON 结果。
 - `docs/adr/` 中的版本、SHM、QoS、时间戳 ADR。
@@ -32,6 +38,9 @@
 
 ## 测试与验收
 
+- 所有生产 Compose 通过 `docker compose config`；引用的配置、Dockerfile 和挂载源路径都存在。
+- 在不依赖开发者机器残留文件的干净环境中，mock 路径可启动。
+- base image 中所需模块都有固定 digest、来源和 API 清单；真实 GigE 桩实现不会被误判为真机采集。
 - schema 正反例测试，未知 major version 必须拒绝。
 - 同机 10 分钟和跨机 30 分钟基准，无无界内存增长。
 - 报告 p50/p95/p99 延迟、吞吐、CPU、copy/SHM 模式、drop 和 RSS。
