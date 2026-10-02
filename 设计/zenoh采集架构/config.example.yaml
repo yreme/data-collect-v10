@@ -1,0 +1,98 @@
+# 设计示例，不可直接用于生产；任务 00/02 应为它提供 JSON Schema。
+api_version: waytous.io/v1alpha1
+site: yard01
+
+zenoh:
+  mode: client
+  endpoints:
+    - tcp/server-a:7447
+  namespace: rt/yard01
+  shared_memory:
+    enabled: true
+    # 由任务 00 基准确定，不能只凭此字段认定零拷贝生效。
+    pool_bytes: 1073741824
+
+time:
+  host_clock: CLOCK_TAI
+  require_ptp_lock_for_level: L2
+  max_offset_ns: 100000
+
+catalog:
+  heartbeat_sec: 2
+  offline_ttl_sec: 8
+
+sensors:
+  cameras:
+    - id: cam_corner_0
+      description: 右上角相机
+      serial: DA6567920
+      enabled: true
+      data_key: rt/yard01/sensor/camera/cam_corner_0/data
+      capture:
+        mode: external_trigger
+        hz: 20
+        pixel_format: BGR8
+        width: 1920
+        height: 1080
+        exposure_auto: Continuous
+        exposure_us: 12000
+        gain_auto: Continuous
+        gain_db: 0.0
+      publish:
+        hz: 20
+        queue: latest-only
+        congestion: drop
+      preview:
+        hz: 1
+        width: 960
+        jpeg_quality: 75
+  lidars:
+    - id: lidar_left
+      description: 左侧雷达
+      enabled: true
+      frame_id: lidar_left
+      msop_port: 6699
+      difop_port: 7788
+      data_key: rt/yard01/sensor/lidar/lidar_left/data
+      publish:
+        hz: 10
+        queue: latest-only
+        congestion: drop
+  imus:
+    - id: imu0
+      description: 主 IMU
+      enabled: true
+      frame_id: imu_link
+      transport: udp
+      listen_port: 2368
+      source_port: 2369
+      data_key: rt/yard01/sensor/imu/imu0/data
+      publish:
+        hz: 20
+        queue_capacity: 256
+        reliability: reliable
+        congestion: block
+  plcs:
+    - id: plc0
+      description: 主 PLC
+      enabled: false
+      data_key: rt/yard01/sensor/plc/plc0/data
+
+console:
+  database: /var/lib/sensor-console/console.sqlite3
+  config_history_dir: /var/lib/sensor-console/config-history
+  active_config: /var/lib/sensor-console/active.yaml
+  authentication:
+    enabled: true
+
+foxglove:
+  listen: 0.0.0.0:8765
+  defaults:
+    camera_hz: 1
+    lidar_hz: 1
+    imu_hz: 10
+
+recording:
+  output_dir: /data/mcap
+  rotate_sec: 1800
+  min_free_bytes: 107374182400
