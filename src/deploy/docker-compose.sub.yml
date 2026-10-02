@@ -27,6 +27,16 @@ services:
     volumes:
       - ${RECORD_DIR:-/data/records}:/data/records
 
+  sub-multimodal-sync:
+    extends: { file: common.yml, service: sensorhub-base }
+    profiles: [multimodal, all]
+    image: sensorhub-sub-multimodal-sync:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: sub_client/sub-multimodal-sync/Dockerfile
+      args: { BASE_IMAGE: "${FOXGLOVE_IMAGE}" }
+    container_name: sensorhub-sub-multimodal-sync
+
   sub-imu-record:
     extends: { file: common.yml, service: sensorhub-base }
     profiles: [record, all]
