@@ -34,4 +34,4 @@ services:
       dockerfile: sub_client/sub-template-python/Dockerfile
       args: { PIP_INDEX_URL: "${PIP_INDEX_URL:-https://pypi.org/simple}" }
     container_name: sensorhub-sub-example
-    command: ["--mode", "sync", "--keys", "rig/camera/*/image,rig/lidar/*/points", "--base-hz", "10"]
+    command: ["--mode", "sync", "--keys", "rig/camera/cam_corner_0/image,rig/camera/cam_corner_1/image,rig/lidar/lidar0/points", "--base-hz", "10"]

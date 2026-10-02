@@ -26,7 +26,9 @@ from typing import Dict
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "common" / "python"))
+_SDK = Path(__file__).resolve().parent.parent.parent / "common" / "python"
+if _SDK.is_dir():  # 源码树内直接运行；容器内 SDK 已 pip 安装
+    sys.path.insert(0, str(_SDK))
 
 from sensorhub.header import IMAGE_ENCODINGS  # noqa: E402
 from sensorhub.node import SensorNode  # noqa: E402
@@ -73,6 +75,8 @@ def run_latest(session, keys, stop: threading.Event, app: SensorNode) -> None:
 
 
 def run_sync(session, keys, base_hz: float, stop: threading.Event) -> None:
+    if any("*" in k for k in keys):
+        raise SystemExit("--mode sync 需要具体 key（不能含 *），例如 rig/camera/cam_corner_0/image,rig/lidar/lidar0/points")
     def on_group(slot_ns: int, group: Dict[str, Frame]) -> None:
         spread = (max(f.header.stamp_ns for f in group.values()) - min(f.header.stamp_ns for f in group.values())) / 1e6
         LOG.info("同步组 %s  %d/%d 路  stamp 跨度 %.2fms", time.strftime("%H:%M:%S", time.localtime(slot_ns / 1e9)),

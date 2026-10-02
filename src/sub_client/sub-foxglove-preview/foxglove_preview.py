@@ -26,7 +26,9 @@ from typing import Dict, Optional
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "common" / "python"))
+_SDK = Path(__file__).resolve().parent.parent.parent / "common" / "python"
+if _SDK.is_dir():  # 源码树内直接运行；容器内 SDK 已 pip 安装
+    sys.path.insert(0, str(_SDK))
 
 from sensorhub import keys as K  # noqa: E402
 from sensorhub.codecs import IMU_SAMPLE_DTYPE, POINT_DTYPES  # noqa: E402
