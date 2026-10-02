@@ -108,14 +108,27 @@ def load(path: Optional[Union[str, Path]] = None, *, strict: bool = True) -> Dic
     return cfg
 
 
-def devices(cfg: Dict[str, Any], section: str, *, enabled_only: bool = True) -> List[Dict[str, Any]]:
-    """合并 defaults + overrides + 设备字段。"""
+def host_id(cfg: Dict[str, Any]) -> str:
+    """本机标识：env SENSORHUB_HOST_ID 优先，其次 system.host_id。"""
+    return os.environ.get("SENSORHUB_HOST_ID") or str((cfg.get("system") or {}).get("host_id") or "")
+
+
+def devices(cfg: Dict[str, Any], section: str, *, enabled_only: bool = True,
+            host: Optional[str] = None) -> List[Dict[str, Any]]:
+    """合并 defaults + overrides + 设备字段。
+
+    host 不为空时只返回 ``host`` 字段等于它（或未设置 host）的设备 —— 服务器 A/D 共用一份配置时，
+    pub 用 ``devices(cfg, "cameras", host=host_id(cfg))`` 只打开接在本机的设备。
+    """
     block = cfg.get(section) or {}
     defaults = block.get("defaults") or {}
     shared = {k: v for k, v in block.items() if k not in ("defaults", "devices")}
     out = []
     for d in block.get("devices") or []:
         if enabled_only and not d.get("enabled", True):
+            continue
+        dev_host = d.get("host", (d.get("overrides") or {}).get("host", defaults.get("host")))
+        if host and dev_host and str(dev_host) != host:
             continue
         merged = _deep_merge(_deep_merge(shared, defaults), d.get("overrides") or {})
         merged.update({k: copy.deepcopy(v) for k, v in d.items() if k != "overrides"})

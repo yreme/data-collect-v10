@@ -151,3 +151,19 @@ def test_config_validation_errors():
     assert any("Bad-Name" in e for e in errs)
     assert any("重复" in e for e in errs)
     assert any("hz=3" in e for e in errs)
+
+
+def test_devices_host_filter(monkeypatch):
+    cfg = C.parse("""
+system: {host_id: server_a}
+cameras:
+  defaults: {hz: 20}
+  devices:
+    - {name: a0, host: server_a}
+    - {name: d0, host: server_d}
+    - {name: any0}
+""")
+    assert [d["name"] for d in C.devices(cfg, "cameras")] == ["a0", "d0", "any0"]
+    assert [d["name"] for d in C.devices(cfg, "cameras", host=C.host_id(cfg))] == ["a0", "any0"]
+    monkeypatch.setenv("SENSORHUB_HOST_ID", "server_d")
+    assert [d["name"] for d in C.devices(cfg, "cameras", host=C.host_id(cfg))] == ["d0", "any0"]
