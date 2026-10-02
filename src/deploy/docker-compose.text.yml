@@ -1,0 +1,45 @@
+# =============================================================================
+# 文本传感器联调（IMU + PLC + Foxglove 预览），无需相机/雷达硬件：
+#   docker compose -f docker-compose.core.yml -f docker-compose.text.yml up -d --build
+#   Foxglove Studio -> ws://<server>:8765
+# =============================================================================
+services:
+  pub-imu:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    image: sensorhub-pub-imu:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: pub_server/pub-imu/Dockerfile
+      args:
+        BASE_IMAGE: ${IMU_IMAGE:-python:3.12-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    container_name: sensorhub-pub-imu
+    command: ["--mock"]
+
+  pub-plc:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    image: sensorhub-pub-plc:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: pub_server/pub-plc/Dockerfile
+      args: { PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple} }
+    container_name: sensorhub-pub-plc
+    command: ["--mock"]
+
+  foxglove-preview:
+    extends: { file: common.yml, service: sensorhub-base }
+    image: sensorhub-foxglove-preview:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: sub_client/sub-foxglove-preview/Dockerfile
+      args:
+        BASE_IMAGE: ${FOXGLOVE_IMAGE:-python:3.12-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    container_name: sensorhub-foxglove-preview
+    command:
+      - "--hz"
+      - "${PREVIEW_HZ:-1}"
+      - "--port"
+      - "${FOXGLOVE_PORT:-8765}"
+      - "--keys"
+      - "${SENSORHUB_PREFIX:-rig}/imu/*/data,${SENSORHUB_PREFIX:-rig}/plc/*/state"

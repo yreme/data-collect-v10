@@ -39,6 +39,8 @@ python3 src/sub_client/sub-foxglove-preview/foxglove_preview.py --hz 1 &
 ```bash
 cd src/deploy && cp .env.example .env
 docker compose -f docker-compose.core.yml -f docker-compose.mock.yml up -d --build
+# 仅 IMU + PLC + Foxglove 预览（无相机/雷达）：
+docker compose -f docker-compose.core.yml -f docker-compose.text.yml up -d --build
 ```
 
 ## 测试
@@ -47,6 +49,7 @@ docker compose -f docker-compose.core.yml -f docker-compose.mock.yml up -d --bui
 cd src/common/python && python3 -m pytest -q          # SDK（含 zenoh 集成，需本机可起 session）
 cd src/console && python3 -m pytest -q                # 控制台
 python3 src/tests/e2e_mock_stack.py                   # 端到端：zenohd + mock + console + preview + sub
+python3 src/tests/e2e_text_stack.py                  # IMU/PLC mock + foxglove 预览
 g++ -std=c++17 -I src/common/cpp src/common/cpp/tests/test_frame_header.cpp -o /tmp/t && /tmp/t
 ```
 
