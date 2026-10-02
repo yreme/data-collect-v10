@@ -1,0 +1,37 @@
+// =============================================================================
+// sensorhub 路由器配置（服务器 D，AI 分析主机）
+// D 的本机程序连 D 的 127.0.0.1:7447；D 路由器通过万兆网连接 A 路由器。
+// 跨机只传输 D 上实际有订阅的 key（zenoh 按订阅路由），A 的原始流不会被无差别推送。
+// =============================================================================
+{
+  mode: "router",
+  listen: { endpoints: ["tcp/0.0.0.0:7447"] },
+  connect: {
+    // ← 修改为服务器 A 万兆网卡 IP
+    endpoints: ["tcp/192.168.10.1:7447"],
+    timeout_ms: -1,
+    exit_on_failure: false,
+  },
+  scouting: {
+    multicast: { enabled: false },
+    gossip: {
+      enabled: true,
+      multihop: false,
+      autoconnect: { router: [], peer: ["router", "peer"] },
+    },
+  },
+  adminspace: { enabled: true, permissions: { read: true, write: false } },
+  transport: {
+    shared_memory: { enabled: true },
+    link: {
+      rx: { buffer_size: 16777216, max_message_size: 1073741824 },
+    },
+  },
+  plugins_loading: {
+    enabled: true,
+    search_dirs: [{ kind: "current_exe_parent" }, "/opt/zenoh/lib", "/usr/lib", "/usr/local/lib"],
+  },
+  plugins: {
+    rest: { http_port: 8000 },
+  },
+}

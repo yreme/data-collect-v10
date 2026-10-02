@@ -1,0 +1,172 @@
+# =============================================================================
+# sensorhub 统一传感器配置（由 resource/template_prefix_full.yaml 演进而来）
+#
+# - 唯一事实来源：所有 pub 容器只读挂载本文件；控制台(console)负责编辑、校验、版本备份与回滚。
+# - 结构：每类传感器 = defaults（公共参数）+ devices（实例列表，可用 overrides 覆盖 defaults）。
+# - name 必须匹配 [a-z0-9_]+，它决定 Zenoh key：{system.prefix}/{kind}/{name}/{channel}
+# - alias 是给人看的名字（控制台可在线修改，修改结果另存于 console 数据目录，优先级高于此处）。
+# - 频率必须整除 1 秒：1,2,4,5,8,10,20,25,40,50（或 0.5/0.2/0.1）。
+#
+# 相机位置命名约定（沿用模板）：
+#   corner_0..3 = 四个角点（Q1 右上 / Q2 左上 / Q3 左下 / Q4 右下）
+#   side_0/1    = 短边（右侧 / 左侧）
+# =============================================================================
+version: 1
+
+system:
+  prefix: rig                 # Zenoh key 前缀；同机多套系统用不同前缀隔离
+  site: default
+  host_id: server_a
+
+# ---------------------------------------------------------------------------
+# 同步：所有容器共享同一个确定性时间网格（见 docs/05-时间同步与触发设计.md）
+# ---------------------------------------------------------------------------
+sync:
+  base_hz: 20                 # 主节拍；各传感器 hz 必须能整除 base_hz 或与其同属整秒网格
+  clock: chrony               # chrony | ptp（ptp：主机 NIC 作为 PTP grandmaster，相机/雷达做 slave）
+  ptp:
+    enabled: false
+    interface: enp1s0f0       # 连接交换机 C 的万兆口
+    domain: 0
+  apply_on_second_boundary: true   # 频率/模式变更统一在下一个整秒生效
+
+# ---------------------------------------------------------------------------
+# GigE 相机（海康 MVS SDK）
+# ---------------------------------------------------------------------------
+cameras:
+  defaults:
+    hz: 20
+    trigger_mode: software        # software | action_command | hardware | free_run
+    pixel_format: BayerRG8        # 相机输出：BayerRG8 | Mono8 | RGB8（RGB8 20Hz 会超千兆带宽）
+    publish_encoding: bayer_rggb8 # 发布格式：bayer_rggb8(原始,2MB) | bgr8(6MB) | mono8(2MB)
+    width: 1920
+    height: 1080
+    grab_timeout_ms: 1500
+    exposure_auto: Continuous     # Off | Once | Continuous
+    gain_auto: Continuous
+    exposure_us: 12000
+    gain_db: 0.0
+    auto_target_brightness: 100
+    auto_exposure_time_lower_us: 100
+    auto_exposure_time_upper_us: 30000
+    auto_gain_lower_db: 0.0
+    auto_gain_upper_db: 16.0
+    gamma_enable: true
+    gamma: 0.75
+    sharpness_enable: true
+    sharpness: 50
+    packet_size: 8164             # GevSCPSPacketSize，需交换机/网卡开启 MTU 9000
+    packet_delay: 0               # GevSCPD，多相机共享上行时可错开
+    reconnect_interval_sec: 1
+    heartbeat_interval_sec: 1
+    occupation_retry_sec: 3
+    absent_retry_sec: 60
+    link_check_interval_sec: 10   # 通过已打开的句柄读取 GevLinkSpeed 等，不与采集冲突
+    preview:
+      enabled: false              # 是否额外发布 JPEG 预览通道 {name}/preview
+      hz: 1
+      max_width: 640
+  local_ip: 192.168.1.102
+  discover_subnet: 192.168.1.0/24
+  mvs_python_path: /opt/MVS/Samples/64/Python
+  mvs_runenv: /opt/MVS/lib
+  devices:
+    - name: cam_corner_0
+      alias: 右上角相机(Q1)
+      serial: DA6567920
+      enabled: true
+      frame_id: cam_corner_0
+    - name: cam_corner_1
+      alias: 左上角相机(Q2)
+      serial: DA6567950
+      mac: "34:bd:20:65:f8:45"
+      enabled: true
+      frame_id: cam_corner_1
+    - name: cam_corner_2
+      alias: 左下角相机(Q3)
+      serial: DA9746490
+      enabled: true
+      frame_id: cam_corner_2
+    - name: cam_corner_3
+      alias: 右下角相机(Q4)
+      serial: DA8960041
+      enabled: true
+      frame_id: cam_corner_3
+    - name: cam_side_0
+      alias: 右侧短边相机
+      serial: DA9746660
+      mac: "34:bd:20:88:97:13"
+      enabled: true
+      frame_id: cam_side_0
+    - name: cam_side_1
+      alias: 左侧短边相机
+      serial: DA6567861
+      mac: "34:bd:20:65:f7:ec"
+      enabled: true
+      frame_id: cam_side_1
+    - name: cam6
+      alias: 测试相机
+      serial: DA9746575
+      mac: "34:bd:20:88:96:be"
+      enabled: false
+      frame_id: cam6
+
+# ---------------------------------------------------------------------------
+# 激光雷达（速腾 rs_driver）
+# ---------------------------------------------------------------------------
+lidars:
+  defaults:
+    hz: 10
+    lidar_type: RSE1
+    sync_mode: phase_lock         # phase_lock(PTP/PPS 相位锁定) | none(自由旋转，按网格就近归属)
+    phase_lock_deg: 0             # 网格整拍时刻雷达扫过的方位角
+    encoding: xyzirt_f32          # xyzi_f32(16B/点) | xyzirt_f32(24B/点，含线号与点时间)
+    host_address: 0.0.0.0
+    group_address: 0.0.0.0
+    wait_for_difop: true
+    absent_retry_sec: 30
+  discover_subnet: 192.168.1.0/24
+  devices:
+    - name: lidar0
+      alias: 左侧雷达
+      enabled: true
+      frame_id: rslidar0
+      msop_port: 6699
+      difop_port: 7788
+    - name: lidar1
+      alias: 右侧雷达
+      enabled: false
+      frame_id: rslidar1
+      msop_port: 6700
+      difop_port: 7789
+
+# ---------------------------------------------------------------------------
+# IMU（Yesense）
+# ---------------------------------------------------------------------------
+imus:
+  defaults:
+    sample_hz: 200                # 设备原始输出频率
+    publish_hz: 20                # 按网格打包发布（一包含 sample_hz/publish_hz 个样本）
+    transport: udp                # udp | serial
+  devices:
+    - name: imu0
+      alias: 吊具 IMU
+      enabled: true
+      frame_id: imu_link
+      port: 2368
+      imu_src_port: 2369
+      # serial_device: /dev/ttyUSB0
+      # baudrate: 460800
+
+# ---------------------------------------------------------------------------
+# PLC（727R 起重机 UDP）
+# ---------------------------------------------------------------------------
+plcs:
+  defaults:
+    transport: udp
+    health_timeout_sec: 5
+  devices:
+    - name: crane727r
+      alias: 727R 起重机 PLC
+      enabled: true
+      udp_port: 12730

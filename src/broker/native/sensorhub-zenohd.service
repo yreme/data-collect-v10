@@ -1,0 +1,19 @@
+[Unit]
+Description=sensorhub Zenoh router (zenohd)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/zenoh/bin/zenohd -c /etc/sensorhub/zenohd.json5
+Restart=always
+RestartSec=2
+# Zenoh SHM 需要 mlock，必须放开（默认 8MB 会导致 SHM 静默失效）
+LimitMEMLOCK=infinity
+LimitNOFILE=65536
+Environment=RUST_LOG=info
+# 路由器只做发现/跨机转发，给它较高调度优先级即可，不需要实时调度
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

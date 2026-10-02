@@ -1,0 +1,93 @@
+// =============================================================================
+// sensorhub 路由器配置（服务器 A，传感器采集主机）
+// zenohd 1.10.x ；docker 与原生部署共用此文件
+// =============================================================================
+{
+  mode: "router",
+
+  // 本机所有 pub/sub 以 peer 模式连接 127.0.0.1:7447；
+  // 服务器 D 的路由器通过万兆网连接 <A 的 IP>:7447。
+  listen: {
+    endpoints: ["tcp/0.0.0.0:7447"],
+  },
+
+  // 服务器 A 作为汇聚点，不主动连接其他节点（由 D 连过来）。
+  connect: {
+    endpoints: [],
+  },
+
+  scouting: {
+    // 生产环境关闭组播发现：拓扑完全由配置决定，避免误连同网段其他 zenoh 系统。
+    multicast: { enabled: false },
+    // gossip 让本机 peer 彼此发现并直接建立连接（大块数据走 peer<->peer SHM，不经路由器转发）。
+    gossip: {
+      enabled: true,
+      multihop: false,
+      autoconnect: { router: [], peer: ["router", "peer"] },
+    },
+  },
+
+  timestamping: {
+    // 路由器为没有时间戳的数据补 HLC 时间戳（便于诊断）。
+    enabled: { router: true, peer: false, client: false },
+  },
+
+  // 管理空间：控制台读取 @/<zid>/router 获取会话/链路信息（只读）。
+  adminspace: {
+    enabled: true,
+    permissions: { read: true, write: false },
+  },
+
+  transport: {
+    shared_memory: {
+      enabled: true,
+    },
+    link: {
+      tx: {
+        // 大帧在拥塞时：数据流 drop 策略由发布端声明；这里放宽阻塞型消息的关闭等待。
+        queue: {
+          congestion_control: {
+            drop: { wait_before_drop: 1000, max_wait_before_drop_fragments: 50000 },
+            block: { wait_before_close: 5000000 },
+          },
+        },
+      },
+      rx: {
+        // 万兆链路：加大接收缓冲（每链路）。
+        buffer_size: 16777216,
+        max_message_size: 1073741824,
+      },
+    },
+  },
+
+  plugins_loading: {
+    enabled: true,
+    // docker 镜像中插件位于 zenohd 同目录；原生安装放在 /opt/zenoh/lib。
+    search_dirs: [{ kind: "current_exe_parent" }, "/opt/zenoh/lib", "/usr/lib", "/usr/local/lib"],
+  },
+
+  plugins: {
+    // REST 插件：http://<A>:8000/<key-expr>  例如 /rig/*/*/status、/@/*/router
+    rest: {
+      http_port: 8000,
+    },
+    // 最新值缓存（内存）：只缓存小体积 JSON（status / 调度表 / 链路汇总），
+    // 使 REST 与后启动的程序可以 get 到“当前状态”。禁止把图像/点云 key 放进来。
+    storage_manager: {
+      storages: {
+        status_cache: {
+          key_expr: "*/*/*/status",
+          volume: { id: "memory" },
+        },
+        sync_schedule: {
+          key_expr: "*/sync/master/schedule",
+          volume: { id: "memory" },
+        },
+        net_links: {
+          key_expr: "*/net/netprobe/links",
+          volume: { id: "memory" },
+        },
+      },
+    },
+  },
+}

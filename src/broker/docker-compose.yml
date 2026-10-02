@@ -1,0 +1,32 @@
+# =============================================================================
+# sensorhub Broker（zenohd 路由器）—— Docker 部署
+#
+#   cd src/broker && docker compose up -d
+#   curl http://127.0.0.1:8000/@/*/router        # 路由器信息
+#   curl 'http://127.0.0.1:8000/rig/*/*/status'   # 所有传感器 status（REST 插件）
+#
+# 服务器 D：ZENOHD_CONFIG=zenohd.server-d.json5 docker compose up -d
+# 原生（不依赖 docker）部署见 native/README.md
+# =============================================================================
+services:
+  zenohd:
+    image: ${ZENOHD_IMAGE:-eclipse/zenoh:1.10.1}
+    container_name: sensorhub-zenohd
+    restart: unless-stopped
+    # host 网络：本机 peer 通过 gossip 获得的 127.0.0.1 locator 可直连；跨机 D->A 直接走宿主机网卡
+    network_mode: host
+    # 共享宿主机 /dev/shm：路由器参与 SHM 协商（本机 peer 之间数据直连，不经过路由器）
+    ipc: host
+    ulimits:
+      memlock: -1          # Zenoh SHM 需要 mlock；默认 8MB 限制会导致 SHM 静默失效
+      nofile: 65536
+    command: ["-c", "/etc/zenoh/zenohd.json5"]
+    environment:
+      - RUST_LOG=${ZENOH_LOG:-info}
+    volumes:
+      - ./config/${ZENOHD_CONFIG:-zenohd.json5}:/etc/zenoh/zenohd.json5:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8000/@/*/router >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
