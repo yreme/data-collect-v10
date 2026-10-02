@@ -1,0 +1,58 @@
+# Mock SHM 验证：采集程序读取 mock_* 共享内存（不与真实传感器冲突）
+#
+# 1) 启动 mock 回放（宿主机）:
+#    python3 client-mcap-plc-web-src/tools/mcap_mock_shm_replay.py \
+#      /home/user/data/test-data/full-sample/multimodal_2026-08-06_07-06-00.mcap \
+#      --loop --hz 2
+#
+# 2) 启动 mock 采集容器:
+#    cd client-mcap-plc-web-src && docker compose -f docker-compose.mock.yml up -d --build
+
+services:
+  client-mcap-plc-web:
+    build:
+      context: ..
+      dockerfile: client-mcap-plc-web-src/Dockerfile
+      network: host
+    image: client-mcap-plc-web:local
+    container_name: client-mcap-plc-web-mock
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    env_file:
+      - .env
+    environment:
+      MCAP_WEB_PORT: "18882"
+      AUTO_START: "${AUTO_START:-true}"
+      MCAP_ENABLED: "${MCAP_ENABLED:-true}"
+      MCAP_DEDUP_ENABLED: "${MCAP_DEDUP_ENABLED:-true}"
+      MCAP_SENSOR_APPEND_ON_UPDATE: "${MCAP_SENSOR_APPEND_ON_UPDATE:-false}"
+      MCAP_HOURLY_DIR: /data/mcap/hourly
+      MCAP_SHORT_DIR: /data/mcap/short
+      MCAP_HOURLY_ROTATION_SECONDS: "${MCAP_HOURLY_ROTATION_SECONDS:-3600}"
+      MCAP_SHORT_ROTATION_SECONDS: "${MCAP_SHORT_ROTATION_SECONDS:-600}"
+      MCAP_CAMERA_ENCODING: "${MCAP_CAMERA_ENCODING:-video}"
+      MCAP_VIDEO_FPS: "${MCAP_VIDEO_FPS:-20}"
+      MCAP_VIDEO_GOP: "${MCAP_VIDEO_GOP:-20}"
+      MCAP_SHM_CAMERA_PREFIX: mock_gige_
+      MCAP_SHM_IMU_PREFIX: mock_imu_
+      MCAP_SHM_LIDAR_PREFIX: mock_lidar_
+      MCAP_WEB_CONFIG: /app/configs/client_mcap_mock.yaml
+      PLC_SHM_SEGMENT: mock_plc_crane727r
+      TZ: Asia/Shanghai
+    volumes:
+      - ${MCAP_MOCK_HOURLY_HOST_DIR:-/home/user/data/test-data/gige-lidar-imu-plc-data/mock-hourly}:/data/mcap/hourly
+      - ${MCAP_MOCK_SHORT_HOST_DIR:-/home/user/data/test-data/gige-lidar-imu-plc-data/mock-short}:/data/mcap/short
+      - ./configs:/app/configs:ro
+      - /dev/shm:/dev/shm
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18882/api/status')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3

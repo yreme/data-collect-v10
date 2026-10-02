@@ -1,0 +1,64 @@
+
+# MCAP 录制客户端配置（client-save-mcap / client-mcap-web）
+# 相机名与 configs/template_prefix_full.yaml（gige discover 输出）对齐
+
+shm:
+  camera_prefix: gige_
+  imu_prefix: imu_
+  lidar_prefix: lidar_
+
+cameras:
+  - {name: cam_corner_0, enabled: true, topic: /gige/cam_corner_0/image}
+  - {name: cam_corner_1, enabled: true, topic: /gige/cam_corner_1/image}
+  - {name: cam_corner_2, enabled: true, topic: /gige/cam_corner_2/image}
+  - {name: cam_corner_3, enabled: true, topic: /gige/cam_corner_3/image}
+  - {name: cam_side_0, enabled: true, topic: /gige/cam_side_0/image}
+  - {name: cam_side_1, enabled: true, topic: /gige/cam_side_1/image}
+
+imus:
+  - {name: imu0, frame_id: imu_link, enabled: true}
+
+lidars:
+  - {name: lidar0, frame_id: rslidar0, enabled: true}
+  - {name: lidar1, frame_id: rslidar1, enabled: true}
+
+clients:
+  mcap:
+    output_dir: /data/mcap
+    rotate_sec: 60
+    filename_prefix: multimodal
+    allow_overwrite: true
+    compression: zstd
+    camera_topic_prefix: /gige/
+    imu_topic_prefix: /imu/
+    lidar_topic_prefix: /lidar/
+    publish_imu: true
+    publish_world_pose: true
+    publish_scene: false
+    publish_tf: true
+  mcap_compress:
+    output_dir: /data/mcap
+    rotate_sec: 60
+    filename_prefix: multimodal
+    allow_overwrite: true
+    compression: zstd
+    codec: libx264
+    preset: ultrafast
+    gop: 20
+    fps: 20
+    camera_topic_prefix: /gige/
+    imu_topic_prefix: /imu/
+    lidar_topic_prefix: /lidar/
+    publish_imu: true
+    publish_world_pose: true
+    publish_scene: false
+    publish_tf: true
+
+runtime:
+  auto_discover_shm: true
+  shm_rescan_sec: 5.0
+  status_interval_sec: 5.0
+  discover_subnet: 192.168.1.*
+
+
+

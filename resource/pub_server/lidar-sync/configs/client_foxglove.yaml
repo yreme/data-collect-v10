@@ -1,0 +1,37 @@
+# Foxglove 客户端（独立进程/容器）
+# 用法: lidar-sync client foxglove -c configs/client_foxglove.yaml
+# Foxglove 连接: ws://<host>:38765
+#
+# 客户端只需与 server 的 shm.name_prefix + lidars[].name 对齐；
+# 无需配置 msop_port / difop_port / lidar_ip。
+
+capture:
+  hz: 10
+
+shm:
+  name_prefix: lidar_
+  slot_count: 8
+  slot_capacity_bytes: 16777216
+
+lidars:
+  - name: lidar0
+    enabled: true
+    frame_id: rslidar
+  - name: lidar1
+    enabled: false
+    frame_id: rslidar_2
+
+clients:
+  save:
+    enabled: false
+  foxglove:
+    enabled: true
+    host: 0.0.0.0
+    port: 38765
+    topic_prefix: /lidar/
+
+web:
+  enabled: false
+
+runtime:
+  duration_sec: null

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "imu-sync"
+version = "0.1.0"
+description = "Yesense IMU capture server with shared-memory pub/sub and Foxglove/MCAP clients (no ROS required)."
+readme = "imu_sync/README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "ImuWorkspace" }]
+keywords = ["imu", "yesense", "foxglove", "shared-memory", "jetson"]
+
+dependencies = [
+    "PyYAML>=6.0",
+    "pyserial>=3.4",
+]
+
+[project.optional-dependencies]
+foxglove = ["foxglove-sdk>=0.24.0"]
+all = ["foxglove-sdk>=0.24.0"]
+dev = ["foxglove-sdk>=0.24.0", "pytest>=7.0"]
+
+[project.scripts]
+imu-sync = "imu_sync.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["imu_sync*"]
+
+[tool.setuptools.package-data]
+imu_sync = ["py.typed"]

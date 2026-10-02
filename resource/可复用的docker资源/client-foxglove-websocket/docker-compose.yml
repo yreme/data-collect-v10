@@ -1,0 +1,16 @@
+# Foxglove WebSocket 可视化客户端
+# 连接: ws://<host>:8765
+services:
+  client-foxglove:
+    image: ${FOXGLOVE_IMAGE:-registry.cn-beijing.aliyuncs.com/useful-tools/0-tmp-image:client-foxglove-sync-v6.6.24-x64}
+    build:
+      context: ../../..
+      dockerfile: multimodal_src/Dockerfile.foxglove
+      args:
+        BASE_IMAGE: registry.cn-beijing.aliyuncs.com/useful-tools/0-tmp-image:client-foxglove-sync-v6.6.24-x64
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    volumes:
+      - ../../../configs:/app/configs:ro
+    container_name: client-foxglove

@@ -1,0 +1,63 @@
+services:
+  client-mcap-plc-web:
+    build:
+      context: ..
+      dockerfile: client-mcap-plc-web-src/Dockerfile
+      network: host
+    image: client-mcap-plc-web:local
+    container_name: client-mcap-plc-web
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    env_file:
+      - .env
+    environment:
+      MCAP_WEB_PORT: "${MCAP_WEB_PORT:-18881}"
+      AUTO_START: "${AUTO_START:-true}"
+      MCAP_ENABLED: "${MCAP_ENABLED:-true}"
+      MCAP_DEDUP_ENABLED: "${MCAP_DEDUP_ENABLED:-true}"
+      MCAP_HOURLY_DIR: /data/mcap/hourly
+      MCAP_SHORT_DIR: /data/mcap/short
+      MCAP_HOURLY_ROTATION_SECONDS: "${MCAP_HOURLY_ROTATION_SECONDS:-3600}"
+      MCAP_SHORT_ROTATION_SECONDS: "${MCAP_SHORT_ROTATION_SECONDS:-600}"
+      MCAP_HOURLY_RETENTION_DAYS: "${MCAP_HOURLY_RETENTION_DAYS:-30}"
+      MCAP_SHORT_RETENTION_DAYS: "${MCAP_SHORT_RETENTION_DAYS:-1}"
+      MCAP_LIST_LIMIT: "${MCAP_LIST_LIMIT:-10}"
+      MCAP_EMPTY_MAX_UNIQUE_TIMESTAMPS: "${MCAP_EMPTY_MAX_UNIQUE_TIMESTAMPS:-2}"
+      MCAP_CAMERA_ENCODING: "${MCAP_CAMERA_ENCODING:-video}"
+      MCAP_VIDEO_CODEC: "${MCAP_VIDEO_CODEC:-libx264}"
+      MCAP_VIDEO_PRESET: "${MCAP_VIDEO_PRESET:-ultrafast}"
+      MCAP_VIDEO_FPS: "${MCAP_VIDEO_FPS:-20}"
+      MCAP_VIDEO_GOP: "${MCAP_VIDEO_GOP:-20}"
+      MCAP_SHM_CAMERA_PREFIX: "${MCAP_SHM_CAMERA_PREFIX:-}"
+      MCAP_SHM_IMU_PREFIX: "${MCAP_SHM_IMU_PREFIX:-}"
+      MCAP_SHM_LIDAR_PREFIX: "${MCAP_SHM_LIDAR_PREFIX:-}"
+      MCAP_SENSOR_APPEND_ON_UPDATE: "${MCAP_SENSOR_APPEND_ON_UPDATE:-false}"
+      TZ: Asia/Shanghai
+      MCAP_WEB_CONFIG: /app/configs/client_mcap.yaml
+      MCAP_WEB_OUTPUT_DIR: /data/mcap
+      PLC_SHM_SEGMENT: "${PLC_SHM_SEGMENT:-plc_crane727r}"
+      PLC_SHM_PREFIX: "${PLC_SHM_PREFIX:-plc_}"
+      PLC_SHM_DEVICE: "${PLC_SHM_DEVICE:-crane727r}"
+      HEALTH_TIMEOUT: "${HEALTH_TIMEOUT:-5}"
+      SCENE_FRAME_ID: "${SCENE_FRAME_ID:-ground}"
+      SCENE_TROLLEY_FIXED_HEIGHT_M: "${SCENE_TROLLEY_FIXED_HEIGHT_M:-30}"
+      SCENE_GROUND_SIZE_M: "${SCENE_GROUND_SIZE_M:-80}"
+      SCENE_MARKER_SIZE_M: "${SCENE_MARKER_SIZE_M:-2.0}"
+      SCENE_GROUND_ALPHA: "${SCENE_GROUND_ALPHA:-0.08}"
+    volumes:
+      - ${MCAP_HOURLY_HOST_DIR:-/home/user/data/test-data/gige-lidar-imu-plc-data/simple-hourly}:/data/mcap/hourly
+      - ${MCAP_SHORT_HOST_DIR:-/home/user/data/test-data/gige-lidar-imu-plc-data/simple-short}:/data/mcap/short
+      - ./configs:/app/configs:ro
+      - /dev/shm:/dev/shm
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18881/api/status')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3

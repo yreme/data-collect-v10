@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multimodal-sync"
+version = "7.0.0"
+description = "Multimodal sensor fusion: unified Foxglove WebSocket and MCAP clients over camera/IMU/lidar shared memory."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "MultimodalWorkspace" }]
+keywords = ["multimodal", "foxglove", "mcap", "shared-memory", "camera", "imu", "lidar"]
+
+dependencies = [
+    "PyYAML>=6.0",
+    "numpy>=1.21",
+    "foxglove-sdk>=0.24.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+multimodal-sync = "multimodal_sync.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["multimodal_sync*"]

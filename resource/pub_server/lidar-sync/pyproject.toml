@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lidar-sync"
+version = "0.1.0"
+description = "RoboSense rs_driver capture server with shared-memory pub/sub and pluggable clients (Foxglove / local save), no ROS required."
+readme = "lidar_sync/README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "LidarWorkspace" }]
+keywords = ["lidar", "robosense", "rs_driver", "foxglove", "shared-memory", "jetson"]
+
+dependencies = [
+    "PyYAML>=6.0",
+    "numpy>=1.21",
+]
+
+[project.optional-dependencies]
+foxglove = ["foxglove-sdk>=0.24.0"]
+mock = []
+all = ["foxglove-sdk>=0.24.0"]
+dev = ["foxglove-sdk>=0.24.0", "pytest>=7.0"]
+
+[project.scripts]
+lidar-sync = "lidar_sync.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lidar_sync*"]
+
+[tool.setuptools.package-data]
+lidar_sync = ["py.typed"]

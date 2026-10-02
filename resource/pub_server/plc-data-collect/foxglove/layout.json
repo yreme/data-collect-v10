@@ -1,0 +1,105 @@
+{
+  "configById": {
+    "3D!727r-scene": {
+      "cameraState": {
+        "perspective": true,
+        "distance": 80,
+        "phi": 1.1,
+        "thetaOffset": 0.9,
+        "targetOffset": [0, 0, 15],
+        "target": [0, 0, 15]
+      },
+      "followMode": "follow-pose",
+      "scene": {
+        "transforms": {
+          "enable": true,
+          "showLabel": true,
+          "axisScale": 2
+        }
+      },
+      "topics": {
+        "/crane727r/spreader/scene": {
+          "visible": true
+        }
+      }
+    },
+    "RawMessages!727r-raw": {
+      "diffEnabled": false,
+      "showTopicPrefix": false,
+      "topicPath": "/crane727r/plc/raw"
+    },
+    "Plot!727r-position": {
+      "showLegend": true,
+      "paths": [
+        { "value": "/crane727r/kinematics/position.mh_pos", "label": "MH 吊具" },
+        { "value": "/crane727r/kinematics/position.mt_pos", "label": "MT 小车" },
+        { "value": "/crane727r/kinematics/position.mc_pos", "label": "MC 大车" },
+        { "value": "/crane727r/kinematics/position.cntrh_pos", "label": "箱高" }
+      ]
+    },
+    "Plot!727r-velocity": {
+      "showLegend": true,
+      "paths": [
+        { "value": "/crane727r/kinematics/velocity.mh_vel", "label": "MH 速度" },
+        { "value": "/crane727r/kinematics/velocity.mt_vel", "label": "MT 速度" },
+        { "value": "/crane727r/kinematics/velocity.mc_vel", "label": "MC 速度" },
+        { "value": "/crane727r/kinematics/velocity.cntrh_vel", "label": "箱高速度" }
+      ]
+    },
+    "Indicator!727r-smh": {
+      "path": "/crane727r/signals/smh",
+      "style": "bulb"
+    },
+    "Indicator!727r-oicr": {
+      "path": "/crane727r/signals/oicr",
+      "style": "bulb"
+    },
+    "StateTransitions!727r-connection": {
+      "path": "/crane727r/diagnostics/connection.state"
+    },
+    "Gauge!727r-heartbeat": {
+      "path": "/crane727r/diagnostics/heartbeat.heart_beat",
+      "minValue": 0,
+      "maxValue": 65535
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": { "speed": 1 },
+  "layout": {
+    "first": {
+      "first": "3D!727r-scene",
+      "second": {
+        "first": "Plot!727r-position",
+        "second": "Plot!727r-velocity",
+        "direction": "column",
+        "splitPercentage": 55
+      },
+      "direction": "row",
+      "splitPercentage": 58
+    },
+    "second": {
+      "first": {
+        "first": "Indicator!727r-smh",
+        "second": "Indicator!727r-oicr",
+        "direction": "row",
+        "splitPercentage": 50
+      },
+      "second": {
+        "first": "RawMessages!727r-raw",
+        "second": {
+          "first": "Gauge!727r-heartbeat",
+          "second": "StateTransitions!727r-connection",
+          "direction": "column",
+          "splitPercentage": 50
+        },
+        "direction": "column",
+        "splitPercentage": 65
+      },
+      "direction": "column",
+      "splitPercentage": 28
+    },
+    "direction": "row",
+    "splitPercentage": 72
+  }
+}

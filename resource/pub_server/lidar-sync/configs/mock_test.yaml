@@ -1,0 +1,32 @@
+# mock 自测（无需硬件）
+capture:
+  hz: 10
+  mock: true
+
+shm:
+  name_prefix: lidar_
+  slot_count: 4
+  slot_capacity_bytes: 4194304
+
+lidars:
+  - name: lidar0
+    enabled: true
+    frame_id: mock_lidar0
+  - name: lidar1
+    enabled: true
+    frame_id: mock_lidar1
+
+clients:
+  save:
+    enabled: true
+    output_dir: /tmp/lidar_captures
+  foxglove:
+    enabled: true
+    port: 38765
+
+web:
+  enabled: true
+  port: 18090
+
+runtime:
+  duration_sec: 5

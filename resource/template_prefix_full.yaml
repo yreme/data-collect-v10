@@ -1,0 +1,161 @@
+# x64 生产配置（推荐）
+#
+# 特点：
+# - 仅按 serial 标识相机，无需写死 IP（掉线/换 IP 后自动解析）
+# - 某路相机找不到时其它路照常采集；缺席相机每 absent_retry_sec 再尝试
+# - 同步频率 hz=25 → 每秒 0/40/80/…/960ms 网格触发（与其它传感器对齐）
+#
+# 用法：
+#   python discover.py -filter configs/template_prefix_full.yaml -o configs/x64.yaml
+#   python server.py -c configs/x64.yaml
+#
+# 环境变量：GIGE_SUBNET GIGE_LOCAL_IP GIGE_ABSENT_RETRY GIGE_WEB_PORT
+
+#角点1（右上）：corner_q1 (Quadrant 1)
+#角点2（左上）：corner_q2
+#角点3（左下）：corner_q3
+#角点4（右下）：corner_q4
+#短边的摄像头：
+#短边1（右侧，对应1/4圆弧处）：side_q12 (介于Q1和Q2之间，或直接叫 side_right)
+#短边2（左侧，对应3/4圆弧处）：side_q34 (介于Q3和Q4之间，或直接叫 side_left)
+
+capture:
+  hz: 2
+  grab_timeout_ms: 1500
+  jpeg_quality: 98
+  bayer_method: 2
+  grid_orchestrator: true
+  exposure_auto: "Continuous" # Off / Once / Continuous
+  gain_auto: "Continuous" # Off / Once / Continuous（开启后曝光到上限再提增益）
+  exposure_us: 12000
+  gain_db: 0.0
+  auto_target_brightness: 100 # 自动曝光目标亮度 0-255（exposure_auto != Off 时生效）
+  auto_exposure_time_lower_us: 100 # 自动曝光下限（us）
+  auto_exposure_time_upper_us: 30000 # 自动曝光上限（us），不超过 period_ms 留余量
+  auto_gain_lower_db: 0.0 # 自动增益下限（dB）
+  auto_gain_upper_db: 16.0 # 自动增益上限（dB），越大夜晚越亮但噪点越多
+  gamma_enable: true
+  gamma: 0.75
+  sharpness_enable: true
+  sharpness: 50
+  reconnect_interval_sec: 1
+  heartbeat_interval_sec: 1
+  occupation_retry_sec: 3
+  absent_retry_sec: 60
+  local_ip: 192.168.1.102
+  mvs_python_path: /opt/MVS/Samples/aarch64/Python
+  mvs_runenv: /opt/MVS/lib
+  mock: false
+  auto_discover: false
+  discover_subnet: 192.168.1.*
+
+shm:
+  name_prefix: gige_
+  slot_count: 8
+  slot_capacity_bytes: 4194304
+  sync_registry_name: gige_sync_registry
+  sync_stale_periods: 3
+
+imus:
+  - name: imu0
+    frame_id: imu_link
+    enabled: true
+    transport: udp
+    port: 2368
+    imu_src_port: 2369
+  # host_address / imu_ip 可由 IMU_LOCAL_IP 与自动发现填充
+  #
+
+lidars:
+  - name: lidar0
+    enabled: true
+    frame_id: rslidar0
+  - name: lidar1
+    enabled: false
+    frame_id: rslidar1
+
+# 只需 serial（或 mac）；camera_ip 可省略
+cameras:
+  - name: cam_corner_0
+    serial: DA6567920
+    enabled: true
+    topic: /gige/cam_corner_0/image
+  - name: cam_corner_1
+    serial: DA6567950
+    #MAC	34:bd:20:65:f8:45
+    enabled: true
+    topic: /gige/cam_corner_1/image
+
+  - name: cam_corner_2
+    serial: DA9746490
+    enabled: true
+    topic: /gige/cam_corner_2/image
+
+  - name: cam_corner_3
+    serial: DA8960041
+    enabled: true
+    topic: /gige/cam_corner_3/image
+
+  - name: cam_side_0
+    serial: DA9746660
+    #MAC	34:bd:20:88:97:13
+    enabled: true
+    topic: /gige/cam_side_0/image
+
+  - name: cam_side_1
+    serial: DA6567861
+    #MAC	34:bd:20:65:f7:ec
+    enabled: true
+    topic: /gige/cam_side_1/image
+  # 示例：缺席相机（启用后每 60s 尝试一次，不影响其它路）
+  # - name: cam_spare
+  #   serial: DA0000000
+  #   enabled: true
+  - name: cam6
+    serial: DA9746575
+    #MAC	34:bd:20:88:96:be
+    enabled: false
+    topic: /gige/cam6_test/image
+  # 示例：缺席相机（启用后每 60s 尝试一次，不影响其它路）
+  # - name: cam_spare
+  #   serial: DA0000000
+  #   enabled: true
+
+clients:
+  sync_batch: true
+  save:
+    enabled: true
+    output_dir: /data/captures
+    per_camera_subdir: true
+  foxglove:
+    enabled: true
+    host: 0.0.0.0
+    port: 8765
+  mcap:
+    enabled: false
+    output_dir: /data/mcap
+    rotate_sec: 30
+    allow_overwrite: true
+  mcap_compress:
+    enabled: false
+    output_dir: /data/mcap_video
+    rotate_sec: 30
+    allow_overwrite: true
+    codec: libx264
+    preset: ultrafast
+  preview:
+    enabled: true
+    host: 0.0.0.0
+    port: 18081
+    default_refresh: 1hz
+    idle_timeout_sec: 300
+    idle_refresh: 1min
+
+web:
+  enabled: true
+  host: 0.0.0.0
+  port: 18080
+
+runtime:
+  duration_sec: null
+  status_interval_sec: 5.0

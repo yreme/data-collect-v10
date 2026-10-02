@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>727R PLC 监控</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-cyan-300">727R 起重机 PLC 实时监控</h1>
+        <p class="text-slate-400 text-sm mt-1">UDP 采集 · 双档 MCAP 归档 · Web 监控 · 2 Hz</p>
+      </div>
+      <div id="statusBadge" class="px-3 py-1 rounded-full text-sm w-fit">连接中...</div>
+    </header>
+
+    <section id="healthBanner" class="hidden rounded-xl border p-4 text-sm"></section>
+    <section id="anomalyBanner" class="hidden rounded-xl border p-4 text-sm"></section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+      <h2 class="text-lg font-semibold text-slate-200">连接设置</h2>
+      <p class="text-sm text-slate-400">
+        UDP 被动接收：绑定本机端口后等待数据推送。真实 UDP 模式下，若超时未收到数据将<strong class="text-rose-300">停止采集与 MCAP 录制</strong>并提示错误。
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <label class="block text-sm">
+          <span class="text-slate-400">本机监听端口</span>
+          <input id="listenPort" type="number" value="12730" class="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2" />
+        </label>
+        <label class="block text-sm">
+          <span class="text-slate-400">来源 IP 过滤（可选）</span>
+          <input id="filterIp" type="text" placeholder="如 10.172.237.32" class="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2" />
+        </label>
+        <label class="block text-sm">
+          <span class="text-slate-400">通路超时 (秒)</span>
+          <input id="healthTimeout" type="number" value="5" min="1" class="mt-1 w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2" />
+        </label>
+        <label class="flex items-center gap-2 text-sm mt-6">
+          <input id="mockMode" type="checkbox" class="rounded" checked />
+          <span>Mock 模拟数据</span>
+        </label>
+        <div class="flex gap-2 items-end">
+          <button id="startBtn" class="flex-1 bg-cyan-600 hover:bg-cyan-500 rounded-lg py-2 font-medium">开始</button>
+          <button id="stopBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-2">停止</button>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <span class="text-sm text-slate-400 mr-2">预设数据源：</span>
+        <button class="preset px-3 py-1 text-xs rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700" data-ip="10.172.241.102">副DC #1</button>
+        <button class="preset px-3 py-1 text-xs rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700" data-ip="10.172.241.103">副DC #2</button>
+        <button class="preset px-3 py-1 text-xs rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700" data-ip="10.172.237.32">727R 本机</button>
+      </div>
+      <div id="stats" class="text-sm text-slate-400 grid grid-cols-2 md:grid-cols-6 gap-2"></div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <h2 class="text-lg font-semibold text-slate-200 mb-3">UDP 数据质量</h2>
+        <div id="anomalyStats" class="text-sm text-slate-400 space-y-1"></div>
+        <div class="mt-4">
+          <h3 class="font-medium mb-2 text-slate-300">最近解析异常</h3>
+          <div id="recentErrors" class="space-y-1 text-xs max-h-40 overflow-y-auto"></div>
+        </div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <h2 class="text-lg font-semibold text-slate-200 mb-3">变量变化</h2>
+        <div id="recentChanges" class="space-y-1 text-xs max-h-56 overflow-y-auto"></div>
+      </div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+      <h2 class="text-lg font-semibold text-slate-200">MCAP 双档自动保存</h2>
+      <p class="text-sm text-slate-400">
+        数据通路正常时同时写入两档 MCAP。仅当 PLC 有效字段变化时才写入（忽略心跳与时间戳），以减小文件体积。
+        文件名格式为 <code class="text-cyan-300">起止时间.mcap</code>（北京时间）。1 小时档保留 30 天；10 分钟档保留 1 天。
+      </p>
+      <label class="flex items-center gap-2 text-sm">
+        <input id="mcapEnabled" type="checkbox" class="rounded" checked />
+        <span>启用 MCAP 录制</span>
+      </label>
+      <div id="mcapTierStats" class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm"></div>
+      <button id="saveMcapConfig" class="bg-indigo-600 hover:bg-indigo-500 rounded-lg px-4 py-2 text-sm">保存 MCAP 配置</button>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <h3 class="font-semibold mb-3">吊具信号 (SMH)</h3>
+        <div id="smhFlags" class="grid grid-cols-2 gap-2 text-sm"></div>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <h3 class="font-semibold mb-3">大车/车道信号 (OICR)</h3>
+        <div id="oicrFlags" class="grid grid-cols-2 gap-2 text-sm"></div>
+      </div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <h3 class="font-semibold mb-3">位置曲线</h3>
+      <div class="h-72"><canvas id="posChart"></canvas></div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <h3 class="font-semibold mb-3">速度曲线 (mm/s)</h3>
+      <div class="h-56"><canvas id="velChart"></canvas></div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <h3 class="font-semibold mb-3">集装箱高度 & 心跳</h3>
+      <div class="h-48"><canvas id="auxChart"></canvas></div>
+    </section>
+  </div>
+
+  <script>
+    const SMH_LABELS = {
+      spr_sp20: '20尺吊具', spr_sp40: '40尺吊具', spr_sp45: '45尺吊具',
+      mh_spr_lcked: '吊具闭锁', mh_spr_unlcked: '吊具开锁', mh_spr_landed: '吊具着箱',
+      hoist_up: '吊具上升', hoist_down: '吊具下降'
+    };
+    const OICR_LABELS = {
+      outside: '外集卡车道', inside: '内集卡车道', crane_maintain: '维修模式',
+      crane_left: '大车向左', crane_right: '大车向右', crane_street: '过街模式',
+      reserved1: '备用1', reserved2: '备用2'
+    };
+
+    const healthStyles = {
+      connected: 'bg-emerald-900/40 border-emerald-700 text-emerald-200',
+      waiting: 'bg-amber-900/40 border-amber-700 text-amber-200',
+      disconnected: 'bg-rose-900/40 border-rose-700 text-rose-200',
+      error: 'bg-rose-900/40 border-rose-700 text-rose-200',
+      idle: 'bg-slate-800 border-slate-700 text-slate-300'
+    };
+
+    let posChart, velChart, auxChart, velocityHistory = [];
+    let changeFeed = [];
+
+    function fmtTime(ts) {
+      if (!ts) return '-';
+      return new Date(ts * 1000).toLocaleString('zh-CN', { hour12: false });
+    }
+
+    function fmtVal(v) {
+      if (typeof v === 'boolean') return v ? 'ON' : 'OFF';
+      return v ?? '-';
+    }
+
+    function flagHtml(containerId, labels, data) {
+      const el = document.getElementById(containerId);
+      el.innerHTML = Object.entries(labels).map(([k, label]) => {
+        const on = data?.[k];
+        return `<div class="flex items-center justify-between rounded-lg px-3 py-2 ${on ? 'bg-emerald-900/50 text-emerald-200' : 'bg-slate-800 text-slate-400'}">
+          <span>${label}</span><span class="font-mono text-xs">${on ? 'ON' : 'OFF'}</span></div>`;
+      }).join('');
+    }
+
+    function buildChart(ctx, datasets, y1 = false) {
+      const options = {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'second', displayFormats: { second: 'HH:mm:ss' } },
+            ticks: { color: '#94a3b8' },
+            grid: { color: '#1e293b' }
+          },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+        },
+        plugins: { legend: { labels: { color: '#cbd5e1' } } }
+      };
+      if (y1) options.scales.y1 = { position: 'right', ticks: { color: '#94a3b8' }, grid: { drawOnChartArea: false } };
+      return new Chart(ctx, { type: 'line', data: { datasets }, options });
+    }
+
+    function initCharts() {
+      posChart = buildChart(document.getElementById('posChart'), [
+        { label: 'MH_POS', borderColor: '#22d3ee', data: [], tension: 0.2 },
+        { label: 'MT_POS', borderColor: '#a78bfa', data: [], tension: 0.2 },
+        { label: 'MC_POS', borderColor: '#fbbf24', data: [], tension: 0.2 },
+      ]);
+      velChart = buildChart(document.getElementById('velChart'), [
+        { label: 'MH', borderColor: '#22d3ee', data: [], tension: 0.2 },
+        { label: 'MT', borderColor: '#a78bfa', data: [], tension: 0.2 },
+        { label: 'MC', borderColor: '#fbbf24', data: [], tension: 0.2 },
+      ]);
+      auxChart = buildChart(document.getElementById('auxChart'), [
+        { label: 'CNTRH_POS', borderColor: '#34d399', data: [], tension: 0.2, yAxisID: 'y' },
+        { label: 'HEART_BEAT', borderColor: '#f87171', data: [], tension: 0.1, yAxisID: 'y1' },
+      ], true);
+    }
+
+    function updateCharts(history, velocities) {
+      const cutoff = Date.now() - 300000;
+      const points = history.filter(p => p.received_at * 1000 >= cutoff);
+      const toPts = (key) => points.map(p => ({ x: p.received_at * 1000, y: p[key] }));
+
+      posChart.data.datasets[0].data = toPts('mh_pos');
+      posChart.data.datasets[1].data = toPts('mt_pos');
+      posChart.data.datasets[2].data = toPts('mc_pos');
+      posChart.update('none');
+
+      if (velocities) {
+        velocityHistory.push({ t: Date.now(), ...velocities });
+        velocityHistory = velocityHistory.filter(v => v.t >= cutoff);
+        velChart.data.datasets[0].data = velocityHistory.map(v => ({ x: v.t, y: v.mh_vel }));
+        velChart.data.datasets[1].data = velocityHistory.map(v => ({ x: v.t, y: v.mt_vel }));
+        velChart.data.datasets[2].data = velocityHistory.map(v => ({ x: v.t, y: v.mc_vel }));
+        velChart.update('none');
+      }
+
+      auxChart.data.datasets[0].data = toPts('cntrh_pos');
+      auxChart.data.datasets[1].data = toPts('heart_beat');
+      auxChart.update('none');
+    }
+
+    function renderMcapTier(tierKey, tier, mcap = {}) {
+      const files = tier.files || [];
+      return `<div class="bg-slate-800/60 rounded-xl p-4 space-y-2">
+        <div class="font-medium text-slate-200">${tier.label || tierKey}</div>
+        <div class="text-slate-400">
+          录制: <span class="text-cyan-300">${tier.recording ? '进行中' : '未录制'}</span> ·
+          消息: <span class="text-cyan-300">${tier.messages_written || 0}</span>
+        </div>
+        ${tierKey === 'hourly' && mcap.dedup_enabled ? `<div class="text-slate-500 text-xs">去重: 已写入 ${mcap.packets_written || 0} 帧，跳过 ${mcap.packets_skipped || 0} 帧</div>` : ''}
+        <div class="text-slate-500 text-xs break-all">当前: ${tier.current_file || '-'}</div>
+        <div class="text-slate-500 text-xs">目录: ${tier.config?.output_dir || '-'}</div>
+        <div class="text-slate-500 text-xs">保留: ${tier.config?.retention_days ?? '长期'} 天 · 轮转: ${Math.round((tier.config?.rotation_seconds || 0) / 60)} 分钟</div>
+        <h4 class="text-slate-300 text-xs pt-2">最近 ${files.length} 个文件</h4>
+        ${files.length ? files.map(f => `<div class="flex justify-between items-start gap-2 bg-slate-900 rounded px-2 py-1 text-xs">
+          <div class="break-all"><div>${f.name}</div><div class="text-slate-500">${f.path || ''}</div></div>
+          <a class="text-cyan-400 hover:underline shrink-0" href="/api/mcap/download/${tierKey}/${f.name}">下载</a>
+        </div>`).join('') : '<div class="text-slate-500">暂无文件</div>'}
+      </div>`;
+    }
+
+    function updateAnomaly(anomaly) {
+      const banner = document.getElementById('anomalyBanner');
+      if (!anomaly || anomaly.packets_received === 0) {
+        banner.classList.add('hidden');
+      } else if (!anomaly.is_healthy) {
+        banner.className = 'rounded-xl border p-4 text-sm bg-amber-900/40 border-amber-700 text-amber-200';
+        banner.classList.remove('hidden');
+        banner.innerHTML = `<div class="font-medium">UDP 数据质量告警</div>
+          <div class="mt-1">解析错误 ${anomaly.parse_errors} 次，心跳跳变 ${anomaly.heart_beat_stalls} 次，最近错误：${anomaly.last_parse_error || '-'}</div>`;
+      } else {
+        banner.className = 'rounded-xl border p-4 text-sm bg-emerald-900/30 border-emerald-800 text-emerald-200';
+        banner.classList.remove('hidden');
+        banner.innerHTML = `<div class="font-medium">UDP 数据质量正常</div>
+          <div class="mt-1">收包 ${anomaly.packets_received} · 解析成功 ${anomaly.packets_parsed} · 速率 ${anomaly.packet_rate_hz} Hz · 来源 ${anomaly.last_source_ip || '-'}</div>`;
+      }
+
+      document.getElementById('anomalyStats').innerHTML = `
+        <div>收包/解析: <span class="text-cyan-300">${anomaly.packets_received}/${anomaly.packets_parsed}</span></div>
+        <div>解析错误: <span class="text-cyan-300">${anomaly.parse_errors}</span> · 帧头/帧尾/长度: <span class="text-cyan-300">${anomaly.invalid_header}/${anomaly.invalid_footer}/${anomaly.invalid_length}</span></div>
+        <div>包速率: <span class="text-cyan-300">${anomaly.packet_rate_hz} Hz</span> · 心跳: <span class="text-cyan-300">${anomaly.last_heart_beat ?? '-'}</span></div>`;
+
+      const errors = anomaly.recent_errors || [];
+      document.getElementById('recentErrors').innerHTML = errors.length
+        ? errors.map(e => `<div class="bg-slate-800 rounded px-2 py-1">${fmtTime(e.time)} · ${e.message} · ${e.source_ip}:${e.source_port}</div>`).join('')
+        : '<div class="text-slate-500">无异常</div>';
+    }
+
+    function updateChanges(changes, recentPacketChanges) {
+      if (recentPacketChanges?.length) {
+        changeFeed = [...recentPacketChanges, ...changeFeed].slice(0, 30);
+      }
+      const list = changeFeed.length ? changeFeed : (changes?.recent_changes || []);
+      document.getElementById('recentChanges').innerHTML = list.length
+        ? list.map(c => `<div class="bg-slate-800 rounded px-2 py-1">
+            <span class="text-slate-500">${fmtTime(c.time)}</span>
+            <span class="text-cyan-300 ml-2">${c.label}</span>:
+            <span class="text-rose-300">${fmtVal(c.old_value)}</span>
+            → <span class="text-emerald-300">${fmtVal(c.new_value)}</span>
+          </div>`).join('')
+        : '<div class="text-slate-500">暂无变化</div>';
+    }
+
+    function updateHealthBanner(health) {
+      const banner = document.getElementById('healthBanner');
+      const style = healthStyles[health.state] || healthStyles.idle;
+      banner.className = `rounded-xl border p-4 text-sm ${style}`;
+      banner.classList.remove('hidden');
+      banner.innerHTML = `<div class="font-medium">数据通路: ${health.state}</div><div class="mt-1">${health.message}</div>`;
+      if (!health.can_collect && !health.mock_mode) {
+        banner.innerHTML += '<div class="mt-2 text-xs opacity-80">图表与 MCAP 已暂停，请检查 UDP 发送端是否将数据发到本机端口。</div>';
+      }
+    }
+
+    function updateStats(status, recentPacketChanges) {
+      const h = status.health || {};
+      const anomaly = status.anomaly || {};
+      document.getElementById('stats').innerHTML = `
+        <div>监控: <span class="text-cyan-300">${status.running ? '运行中' : '已停止'}</span></div>
+        <div>模式: <span class="text-cyan-300">${status.mock_mode ? 'Mock' : 'UDP'}</span></div>
+        <div>通路: <span class="text-cyan-300">${h.state || '-'}</span></div>
+        <div>已收包: <span class="text-cyan-300">${status.packets_received}</span></div>
+        <div>UDP 速率: <span class="text-cyan-300">${anomaly.packet_rate_hz || 0} Hz</span></div>
+        <div>缓存: <span class="text-cyan-300">${status.buffer_size}</span></div>`;
+
+      const badge = document.getElementById('statusBadge');
+      const ok = h.can_collect && (anomaly.is_healthy !== false);
+      badge.textContent = h.message || (status.running ? '运行中' : '已停止');
+      badge.className = `px-3 py-1 rounded-full text-sm w-fit ${ok ? 'bg-emerald-900 text-emerald-200' : 'bg-rose-900 text-rose-200'}`;
+      updateHealthBanner(h);
+      updateAnomaly(anomaly);
+      updateChanges(status.changes, recentPacketChanges);
+
+      const mcap = status.mcap || {};
+      document.getElementById('mcapEnabled').checked = mcap.enabled !== false;
+      const tiers = mcap.tiers || {};
+      const renderTier = (key) => renderMcapTier(key, tiers[key] || {}, mcap);
+      document.getElementById('mcapTierStats').innerHTML =
+        renderTier('hourly') + renderTier('short');
+    }
+
+    function handleMessage(msg) {
+      if (msg.type === 'init' || msg.type === 'packet' || msg.type === 'health' || msg.type === 'status') {
+        const latest = msg.packet || msg.status?.latest;
+        if (latest) {
+          flagHtml('smhFlags', SMH_LABELS, latest.smh);
+          flagHtml('oicrFlags', OICR_LABELS, latest.oicr);
+        }
+        if (msg.history) updateCharts(msg.history, msg.velocities);
+        if (msg.status) updateStats(msg.status, msg.recent_changes);
+      }
+      if (msg.type === 'mcap' && msg.mcap) {
+        updateStats({ ...msg.status, mcap: msg.mcap });
+      }
+    }
+
+    function connect() {
+      const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+      const ws = new WebSocket(wsUrl);
+      ws.onmessage = (ev) => handleMessage(JSON.parse(ev.data));
+      ws.onclose = () => setTimeout(connect, 2000);
+    }
+
+    async function startMonitor() {
+      const body = {
+        listen_port: parseInt(document.getElementById('listenPort').value, 10),
+        filter_ip: document.getElementById('filterIp').value.trim(),
+        mock_mode: document.getElementById('mockMode').checked,
+        health_timeout: parseFloat(document.getElementById('healthTimeout').value),
+      };
+      const res = await fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      updateStats(await res.json());
+    }
+
+    document.getElementById('startBtn').onclick = startMonitor;
+    document.getElementById('stopBtn').onclick = async () => updateStats(await (await fetch('/api/stop', { method: 'POST' })).json());
+    document.querySelectorAll('.preset').forEach(btn => {
+      btn.onclick = () => { document.getElementById('filterIp').value = btn.dataset.ip; document.getElementById('mockMode').checked = false; };
+    });
+    document.getElementById('saveMcapConfig').onclick = async () => {
+      const body = { enabled: document.getElementById('mcapEnabled').checked };
+      const res = await fetch('/api/mcap/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await res.json();
+      updateStats(await (await fetch('/api/status')).json());
+    };
+
+    initCharts();
+    connect();
+    fetch('/api/status').then(r => r.json()).then(updateStats);
+  </script>
+</body>
+</html>

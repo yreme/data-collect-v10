@@ -1,0 +1,41 @@
+# LiDAR 采集 Server — MAC/名称绑定 + UDP 自动发现
+# 用法: lidar-sync server -c configs/server.yaml
+#
+# 环境变量:
+#   LIDAR_SUBNET=192.168.1.*
+#   LIDAR_LOCAL_IP=192.168.1.*     # 通配：穷举本机该网段所有网卡
+#   LIDAR_AUTO_DISCOVER=1
+
+capture:
+  hz: 10
+  auto_discover: true
+  discover_all: true          # 为子网内所有发现的雷达各启一路采集
+  discover_subnet: 192.168.1.*
+  bind_interface: 0.0.0.0       # 或用 LIDAR_LOCAL_IP=192.168.1.*
+  probe_on_start: true
+  mock: false
+
+shm:
+  name_prefix: lidar_
+  slot_count: 8
+  slot_capacity_bytes: 16777216
+
+# 可选：为特定雷达指定 MAC/名称；未匹配的 discovered 雷达自动命名为 lidar1, lidar2…
+lidars:
+  - name: lidar0
+    frame_id: rslidar
+    enabled: true
+
+clients:
+  save:
+    enabled: false
+  foxglove:
+    enabled: false
+
+web:
+  enabled: true
+  host: 0.0.0.0
+  port: 18090
+
+runtime:
+  status_interval_sec: 5.0

@@ -1,0 +1,15 @@
+capture:
+  hz: 20
+  auto_discover: true
+  discover_subnet: 192.168.1.*
+shm:
+  name_prefix: imu_
+imus: []
+clients:
+  foxglove:
+    enabled: false
+  mcap:
+    enabled: false
+web:
+  enabled: true
+  port: 28090

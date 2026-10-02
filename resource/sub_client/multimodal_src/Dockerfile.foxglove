@@ -1,0 +1,13 @@
+# 基于已构建的 Foxglove 客户端镜像，仅覆盖 Python 代码层
+# 构建: docker build -f multimodal_src/Dockerfile.foxglove -t <tag> .
+ARG BASE_IMAGE=registry.cn-beijing.aliyuncs.com/useful-tools/0-tmp-image:client-foxglove-sync-v6.6.24-x64
+FROM ${BASE_IMAGE}
+
+COPY multimodal_src/multimodal_sync /app/multimodal_sync
+COPY multimodal_src/pyproject.toml /app/pyproject.toml
+COPY configs /app/configs
+
+RUN pip install --no-cache-dir -e /app
+
+# entrypoint: multimodal-sync (来自 base image)
+CMD ["foxglove", "-c", "/app/configs/multimodal.yaml"]

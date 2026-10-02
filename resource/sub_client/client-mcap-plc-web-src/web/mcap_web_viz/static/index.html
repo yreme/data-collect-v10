@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCAP 录制 + IMU 监测</title>
+  <style>
+    :root {
+      --bg: #0f1419; --card: #1a2332; --accent: #3b82f6; --accent-hover: #2563eb;
+      --danger: #ef4444; --danger-hover: #dc2626; --warn: #f59e0b;
+      --text: #e2e8f0; --muted: #94a3b8; --border: #334155; --ok: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem 1rem; }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 1.45rem; margin: 0 0 0.25rem; }
+    h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+    .sub { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.9rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input, select { width: 100%; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.95rem; margin-bottom: 0.9rem; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .btns { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
+    button { flex: 1; padding: 0.75rem 1rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    #btnStart { background: var(--accent); color: white; }
+    #btnStop { background: var(--danger); color: white; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.4rem; background: var(--muted); }
+    .status-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .status-dot.wait { background: var(--warn); }
+    .status-dot.off { background: var(--danger); }
+    .meta { font-size: 0.9rem; line-height: 1.65; }
+    .meta code { background: var(--bg); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.82rem; word-break: break-all; }
+    .shm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 0.75rem 0; }
+    .shm-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; font-size: 0.82rem; }
+    .shm-item strong { display: block; font-size: 1.1rem; }
+    table.progress { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    table.progress th, table.progress td { text-align: left; padding: 0.35rem 0.25rem; border-bottom: 1px solid var(--border); }
+    ul.files { list-style: none; padding: 0; margin: 0; }
+    ul.files li { padding: 0.45rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; word-break: break-all; }
+    .err { color: var(--danger); font-size: 0.85rem; }
+    .warn { color: var(--warn); font-size: 0.85rem; }
+    .nav-link { color: var(--accent); font-size: 0.88rem; }
+    #imuPanel { min-height: 120px; }
+    .imu-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+    .imu-row:last-child { border-bottom: none; }
+    .badge { padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+    .badge.static { background: #334155; }
+    .badge.moving { background: rgba(34,197,94,.25); color: var(--ok); }
+    .badge.uncertain { background: rgba(245,158,11,.2); color: var(--warn); }
+    .meter { flex: 1; min-width: 180px; max-width: 280px; }
+    .meter-bar { height: 12px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); overflow: hidden; }
+    .meter-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #22c55e); width: 0%; transition: width .3s; }
+    canvas.mini { width: 100%; height: 48px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); margin-top: 0.35rem; }
+    @media (max-width: 640px) { .row, .shm-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>MCAP 录制 + IMU 运动监测</h1>
+    <p class="sub">多模态采集控制台 · 近 5 分钟 IMU 缓存 · 每分钟活动量 · 起重机静止/运动判定（≥1m）</p>
+    <p><a class="nav-link" href="/imu-dashboard">全屏 IMU 仪表盘（含参数调节）</a></p>
+
+    <div class="card">
+      <h2>共享内存</h2>
+      <p class="meta" id="shmMessage">检测中…</p>
+      <div class="shm-grid">
+        <div class="shm-item"><strong id="shmCam">0</strong>相机</div>
+        <div class="shm-item"><strong id="shmImu">0</strong>IMU</div>
+        <div class="shm-item"><strong id="shmLidar">0</strong>雷达</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>IMU 实时监测</h2>
+      <div id="imuPanel"><p class="meta" style="color:var(--muted)">加载 IMU 数据…</p></div>
+    </div>
+
+    <div class="card">
+      <h2>录制控制</h2>
+      <label for="prefix">文件名前缀</label>
+      <input id="prefix" value="multimodal" />
+      <label for="outputDir">保存目录</label>
+      <input id="outputDir" value="/data/mcap" />
+      <div class="row">
+        <div>
+          <label for="mode">模式</label>
+          <select id="mode">
+            <option value="mcap">标准 JPEG</option>
+            <option value="compress">H.264 压缩</option>
+          </select>
+        </div>
+        <div>
+          <label for="rotateSec">切分周期（秒）</label>
+          <input id="rotateSec" type="number" min="0" value="60" />
+        </div>
+      </div>
+      <div class="btns">
+        <button id="btnStart">开始录制</button>
+        <button id="btnStop" disabled>停止并保存</button>
+      </div>
+      <p class="warn" id="startHint"></p>
+    </div>
+
+    <div class="card">
+      <p class="meta"><span class="status-dot" id="dot"></span><strong id="stateText">空闲</strong></p>
+      <p class="meta" id="detail"></p>
+      <div id="progressBox" style="display:none">
+        <p class="meta">合计 <code id="totalFrames">0</code> 帧</p>
+        <table class="progress"><thead><tr><th>传感器</th><th>帧数</th></tr></thead><tbody id="frameRows"></tbody></table>
+      </div>
+      <p class="err" id="error"></p>
+      <h3 style="font-size:0.95rem;margin-top:1rem">最近文件</h3>
+      <ul class="files" id="fileList"></ul>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const fmtSec = (s) => { const m = Math.floor(s/60); const sec = Math.floor(s%60); return m>0?`${m}分${sec}秒`:`${sec}秒`; };
+
+    function drawMini(canvas, points, key, color, ymax) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width = canvas.clientWidth;
+      const h = canvas.height = canvas.clientHeight;
+      ctx.clearRect(0,0,w,h);
+      if (!points || points.length < 2) return;
+      const vals = points.map(p => p[key]);
+      const maxV = ymax || Math.max(...vals, 0.001);
+      const minT = points[0].t, maxT = points[points.length-1].t;
+      const span = Math.max(maxT - minT, 1);
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+      points.forEach((p,i) => {
+        const x = ((p.t-minT)/span)*(w-4)+2;
+        const y = h-2-(p[key]/maxV)*(h-4);
+        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    }
+
+    function renderImu(data) {
+      const panel = $('imuPanel');
+      const imus = data.imus || [];
+      if (!imus.length) {
+        panel.innerHTML = '<p class="meta" style="color:var(--muted)">未发现 IMU。请启动 imu-server。</p>';
+        return;
+      }
+      panel.innerHTML = '';
+      imus.forEach(imu => {
+        const m = imu.motion || {};
+        const row = document.createElement('div');
+        row.className = 'imu-row';
+        row.innerHTML = `
+          <div><strong>${imu.name}</strong> <span style="color:var(--muted);font-size:0.8rem">${imu.rate_hz||0} Hz</span></div>
+          <span class="badge ${m.state||'uncertain'}">${m.state||'uncertain'}</span>
+          <div class="meter"><div style="font-size:0.72rem;color:var(--muted)">活动量 ${(m.activity_pct||0).toFixed(0)}%</div>
+            <div class="meter-bar"><div class="meter-fill" style="width:${m.activity_pct||0}%"></div></div></div>
+          <div class="meta" style="font-size:0.8rem">位移 <code>${(m.displacement_m||0).toFixed(2)}m</code> · 速度 <code>${(m.velocity_mps||0).toFixed(3)}</code></div>
+          <div style="flex:1;min-width:200px"><canvas class="mini"></canvas></div>`;
+        panel.appendChild(row);
+        drawMini(row.querySelector('canvas'), imu.series_5min||[], 'activity', '#3b82f6', 100);
+      });
+    }
+
+    async function refreshImu() {
+      try {
+        const res = await fetch('/api/imu/live');
+        renderImu(await res.json());
+      } catch (_) {}
+    }
+
+    function renderShm(shm) {
+      if (!shm) return;
+      $('shmCam').textContent = (shm.cameras||[]).length;
+      $('shmImu').textContent = (shm.imus||[]).length;
+      $('shmLidar').textContent = (shm.lidars||[]).length;
+      $('shmMessage').textContent = shm.message || '';
+      if (!shm.available) {
+        $('startHint').textContent = '无法录制：共享内存无数据。';
+        $('btnStart').disabled = true;
+      } else if (!$('btnStop').disabled) $('startHint').textContent = '';
+    }
+
+    function renderProgress(st) {
+      const box = $('progressBox');
+      if (!st.running) { box.style.display='none'; return; }
+      box.style.display='block';
+      $('totalFrames').textContent = st.total_frames || 0;
+      const tbody = $('frameRows'); tbody.innerHTML = '';
+      const counts = st.frame_counts || {};
+      Object.keys(counts).sort().forEach(k => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><code>${k}</code></td><td>${counts[k]}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function refresh() {
+      const res = await fetch('/api/status');
+      const st = await res.json();
+      renderShm(st.shm);
+      const dot = $('dot');
+      if (st.running && st.waiting_for_data) { dot.className='status-dot wait'; $('stateText').textContent='等待数据…'; }
+      else if (st.running) { dot.className='status-dot on'; $('stateText').textContent='录制中'; }
+      else { dot.className='status-dot off'; $('stateText').textContent='空闲'; }
+      $('detail').innerHTML = st.running
+        ? `已录 <code>${fmtSec(st.elapsed_sec)}</code> · <code>${st.total_frames||0}</code> 帧`
+        : (st.last_file ? `上次 <code>${st.last_file}</code>` : '尚未录制');
+      $('error').textContent = st.error || '';
+      $('btnStop').disabled = !st.running;
+      $('btnStart').disabled = st.running || !(st.shm && st.shm.available);
+      ['prefix','outputDir','mode','rotateSec'].forEach(id => $(id).disabled = st.running);
+      renderProgress(st);
+      const ul = $('fileList'); ul.innerHTML = '';
+      (st.files||[]).forEach(f => { const li = document.createElement('li'); li.textContent=f; ul.appendChild(li); });
+    }
+
+    $('btnStart').onclick = async () => {
+      $('error').textContent = '';
+      const res = await fetch('/api/start', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          prefix: $('prefix').value.trim() || 'multimodal',
+          output_dir: $('outputDir').value.trim() || '/data/mcap',
+          mode: $('mode').value,
+          rotate_sec: Number($('rotateSec').value) || 0,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        $('error').textContent = err.detail || `HTTP ${res.status}`;
+      }
+      await refresh();
+    };
+    $('btnStop').onclick = async () => { await fetch('/api/stop', { method:'POST' }); await refresh(); };
+
+    refresh(); refreshImu();
+    setInterval(refresh, 1500);
+    setInterval(refreshImu, 1000);
+  </script>
+</body>
+</html>

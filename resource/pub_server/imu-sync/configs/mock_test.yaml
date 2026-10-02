@@ -1,0 +1,26 @@
+# Mock 测试（无需硬件）
+capture:
+  hz: 20
+  mock: true
+  auto_discover: false
+
+shm:
+  name_prefix: imu_
+
+imus:
+  - name: imu0
+    enabled: true
+
+clients:
+  foxglove:
+    enabled: true
+    port: 28765
+  mcap:
+    enabled: false
+
+web:
+  enabled: true
+  port: 28090
+
+runtime:
+  duration_sec: 10

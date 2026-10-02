@@ -1,0 +1,29 @@
+# 本地保存客户端
+# 用法: lidar-sync client save -c configs/client_save.yaml
+
+capture:
+  hz: 10
+
+shm:
+  name_prefix: lidar_
+
+lidars:
+  - name: lidar0
+    enabled: true
+  - name: lidar1
+    enabled: false
+
+clients:
+  save:
+    enabled: true
+    output_dir: ./captures
+    format: pcd
+    per_lidar_subdir: true
+  foxglove:
+    enabled: false
+
+web:
+  enabled: false
+
+runtime:
+  duration_sec: null

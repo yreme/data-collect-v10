@@ -1,0 +1,40 @@
+services:
+  crane-monitor:
+    build:
+      context: .
+      network: host
+    image: plc-data-collect:local
+    container_name: crane727r-monitor
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    environment:
+      WEB_PORT: "${WEB_PORT:-8080}"
+      UDP_PORT: "${UDP_PORT:-12730}"
+      AUTO_START: "${AUTO_START:-true}"
+      MOCK_MODE: "${MOCK_MODE:-false}"
+      PLC_SHM_ENABLED: "${PLC_SHM_ENABLED:-true}"
+      PLC_SHM_PREFIX: "${PLC_SHM_PREFIX:-plc_}"
+      PLC_SHM_DEVICE: "${PLC_SHM_DEVICE:-crane727r}"
+      PLC_SHM_SEGMENT: "${PLC_SHM_SEGMENT:-plc_crane727r}"
+      MCAP_ENABLED: "${MCAP_ENABLED:-false}"
+      TZ: Asia/Shanghai
+      HEALTH_TIMEOUT: "${HEALTH_TIMEOUT:-5}"
+      SCENE_FRAME_ID: "${SCENE_FRAME_ID:-ground}"
+      SCENE_TROLLEY_FIXED_HEIGHT_M: "${SCENE_TROLLEY_FIXED_HEIGHT_M:-30}"
+      SCENE_GROUND_SIZE_M: "${SCENE_GROUND_SIZE_M:-80}"
+      SCENE_MARKER_SIZE_M: "${SCENE_MARKER_SIZE_M:-2.0}"
+      SCENE_GROUND_ALPHA: "${SCENE_GROUND_ALPHA:-0.08}"
+    volumes:
+      - ./foxglove:/app/plc-collect/foxglove:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/status')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3

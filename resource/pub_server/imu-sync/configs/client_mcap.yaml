@@ -1,0 +1,32 @@
+# MCAP 录制客户端（只读共享内存）
+# 用法: imu-sync client mcap -c configs/client_mcap.yaml
+
+capture:
+  hz: 20
+
+shm:
+  name_prefix: imu_
+
+imus:
+  - name: imu0
+    frame_id: imu_link
+    enabled: true
+
+clients:
+  foxglove:
+    enabled: false
+  mcap:
+    enabled: true
+    output_dir: ./mcap_out
+    rotate_sec: 60
+    compression: zstd
+    topic_prefix: /imu/
+    filename_prefix: imu
+    publish_scene: true
+    publish_imu: true
+
+web:
+  enabled: false
+
+runtime:
+  status_interval_sec: 5.0

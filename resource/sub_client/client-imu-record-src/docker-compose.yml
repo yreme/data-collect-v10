@@ -1,0 +1,35 @@
+# IMU 共享内存录制（MCAP + CSV）
+#
+# 浏览器: http://<本机IP>:18882
+# 切分: 本地时区每天 00:00 / 06:00 / 12:00 / 18:00
+# 文件: /data/imu/imu_YYYY-MM-DD_HH-MM-SS.mcap|.csv
+#
+# 先启动 server-imu-shm，再:
+#   export IMU_OUTPUT_DIR=./data
+#   mkdir -p ${IMU_OUTPUT_DIR}/imu
+#   docker-compose up -d --build
+
+services:
+  imu-record:
+    build:
+      context: ..
+      dockerfile: client-imu-record/Dockerfile
+      # 避免部分主机缺少 iptables 时 BuildKit bridge 建网失败
+      network: host
+    image: multimodal-imu-record:latest
+    container_name: multimodal-imu-record
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - IMU_RECORD_PORT=${IMU_RECORD_PORT:-18882}
+      - IMU_RECORD_OUTPUT_DIR=/data/imu
+      - IMU_RECORD_DEFAULT_PREFIX=${IMU_RECORD_DEFAULT_PREFIX:-imu}
+      - IMU_RECORD_PERIOD_HOURS=${IMU_RECORD_PERIOD_HOURS:-6}
+      - IMU_RECORD_CONFIG=/app/configs/client_imu_record.yaml
+      - IMU_RECORD_AUTO_START=${IMU_RECORD_AUTO_START:-1}
+    volumes:
+      - ../configs:/app/configs:ro
+      - ${IMU_OUTPUT_DIR:-${MULTIMODAL_OUTPUT_DIR:-./data}}:/data
+      - /dev/shm:/dev/shm
+    entrypoint: ["python3", "-m", "imu_record.main"]

@@ -1,0 +1,42 @@
+capture:
+  hz: 10
+  reconnect_interval_sec: 2
+  discover_subnet: null
+shm:
+  name_prefix: lidar_
+  slot_count: 8
+  slot_capacity_bytes: 16777216
+lidars:
+- name: lidar0
+  lidar_ip: 192.168.1.200
+  mac: ''
+  msop_port: 6699
+  difop_port: 7788
+  lidar_type: RSE1
+  host_address: 0.0.0.0
+  frame_id: lidar0
+  enabled: true
+- name: lidar1
+  lidar_ip: 192.168.1.203
+  mac: ''
+  msop_port: 6698
+  difop_port: 7787
+  lidar_type: RSE1
+  host_address: 0.0.0.0
+  frame_id: lidar1
+  enabled: true
+clients:
+  save:
+    enabled: false
+    output_dir: ./captures
+  foxglove:
+    enabled: true
+    host: 0.0.0.0
+    port: 38765
+web:
+  enabled: true
+  host: 0.0.0.0
+  port: 18090
+runtime:
+  duration_sec: null
+  status_interval_sec: 5.0

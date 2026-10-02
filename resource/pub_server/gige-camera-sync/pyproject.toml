@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gige-camera-sync"
+version = "7.0.0"
+description = "GigE Vision camera capture with grid-synced shared memory publishing."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = [
+    "multimodal-common>=7.0.0",
+    "PyYAML>=6.0",
+    "numpy>=1.21",
+]
+
+[project.optional-dependencies]
+foxglove = ["foxglove-sdk>=0.24.0"]
+all = ["foxglove-sdk>=0.24.0"]
+
+[project.scripts]
+gige-camera-sync = "gige_sync.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gige_sync*"]

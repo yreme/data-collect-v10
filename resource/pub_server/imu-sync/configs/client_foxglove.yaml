@@ -1,0 +1,49 @@
+# Foxglove 客户端（只读共享内存）
+# 用法: imu-sync client foxglove -c configs/client_foxglove.yaml
+# Foxglove Studio: ws://<host>:28765
+
+capture:
+  hz: 20
+
+shm:
+  name_prefix: imu_
+
+imus:
+  - name: imu0
+    frame_id: imu_link
+    enabled: true
+
+clients:
+  foxglove:
+    enabled: true
+    host: 0.0.0.0
+    port: 28765
+    topic_prefix: /imu/
+    publish_imu: true
+    publish_world_pose: true
+    publish_scene: true
+    publish_scene_model: true
+    pose:
+      world_frame: world
+      initial_position: [0, 0, 0]
+      initial_orientation_rpy: [0, 0, 0]
+      # auto: 优先速度 → 位置 → 加速度积分（去重力）
+      # delta: 仅当设备每帧输出相对位移 pos_x/y/z 时使用
+      translation_mode: auto
+      accel_deadband: 0.08
+      gravity: 9.81
+      velocity_damping: 0.02
+      publish_tf: true
+    scene_model:
+      url: https://broadcv.oss-cn-shenzhen.aliyuncs.com/2026/hailab/crane-ship-sim-3D/spreader-glod.glb
+      media_type: model/gltf-binary
+      scale: [1, 1, 1]
+      entity_id: spreader
+  mcap:
+    enabled: false
+
+web:
+  enabled: false
+
+runtime:
+  status_interval_sec: 5.0

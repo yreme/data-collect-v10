@@ -1,0 +1,17 @@
+# 将 IMU 数据实时放到共享内存
+# 启动: docker compose --env-file ../.env up -d
+services:
+  server-imu-sync:
+    image: ${IMU_IMAGE}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    devices:
+      - ${IMU_DEVICE:-/dev/ttyUSB0}:/dev/ttyUSB0
+    volumes:
+      - ../configs:/app/configs:ro
+    command: ["server", "-c", "/app/configs/${SENSORS_CONFIG}"]
+    environment:
+      - CAPTURE_HZ=${CAPTURE_HZ:-10}
+      - CAPTURE_MOCK=${CAPTURE_MOCK:-0}
+    container_name: server-imu-sync

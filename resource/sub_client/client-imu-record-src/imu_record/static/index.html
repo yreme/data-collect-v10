@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IMU 录制控制台</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --accent: #0ea5e9;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --warn: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --border: #334155;
+      --ok: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .wrap { max-width: 780px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+    .sub { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+      margin-bottom: 0.9rem;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .btns { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
+    button {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #btnStart { background: var(--accent); color: white; }
+    #btnStart:hover:not(:disabled) { background: var(--accent-hover); }
+    #btnStop { background: var(--danger); color: white; }
+    #btnStop:hover:not(:disabled) { background: var(--danger-hover); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .status-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 0.4rem;
+      background: var(--muted);
+    }
+    .status-dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .status-dot.wait { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+    .status-dot.off { background: var(--danger); }
+    .meta { font-size: 0.9rem; line-height: 1.65; }
+    .meta code {
+      background: var(--bg);
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .files { max-height: 240px; overflow: auto; font-size: 0.82rem; }
+    .files div { padding: 0.25rem 0; border-bottom: 1px solid var(--border); color: var(--muted); word-break: break-all; }
+    .err { color: var(--danger); margin-top: 0.5rem; font-size: 0.9rem; }
+    .okmsg { color: var(--ok); margin-top: 0.5rem; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>IMU 录制控制台</h1>
+    <p class="sub">从共享内存录制 IMU → MCAP + CSV，本地时区每 6 小时整点切分（0 / 6 / 12 / 18）</p>
+
+    <div class="card">
+      <div class="meta">
+        <div><span id="dot" class="status-dot off"></span><strong id="runLabel">未运行</strong></div>
+        <div>帧数：<code id="frames">0</code>　活跃：<code id="active">—</code></div>
+        <div>当前 MCAP：<code id="curMcap">—</code></div>
+        <div>当前 CSV：<code id="curCsv">—</code></div>
+        <div>下一切分：<code id="nextRotate">—</code></div>
+        <div>共享内存：<code id="shmMsg">检测中…</code></div>
+        <div id="err" class="err"></div>
+        <div id="ok" class="okmsg"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>文件名前缀</label>
+          <input id="prefix" value="imu" />
+        </div>
+        <div>
+          <label>切分周期（小时）</label>
+          <input id="period" type="number" min="1" max="24" value="6" />
+        </div>
+      </div>
+      <label>输出目录（容器内）</label>
+      <input id="outdir" value="/data/imu" />
+      <div class="btns">
+        <button id="btnStart">开始录制</button>
+        <button id="btnStop" disabled>停止</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>最近文件</label>
+      <div class="files" id="files"></div>
+    </div>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    async function api(path, opts) {
+      const r = await fetch(path, opts);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || r.statusText);
+      return data;
+    }
+
+    function render(st) {
+      const running = !!st.running;
+      const waiting = !!st.waiting_for_data;
+      $("dot").className = "status-dot " + (running ? (waiting ? "wait" : "on") : "off");
+      $("runLabel").textContent = running ? (waiting ? "等待数据…" : "录制中") : "未运行";
+      $("frames").textContent = st.total_frames ?? 0;
+      $("active").textContent = (st.active_sensors || []).join(", ") || "—";
+      $("curMcap").textContent = st.current_mcap || "—";
+      $("curCsv").textContent = st.current_csv || "—";
+      $("nextRotate").textContent = st.next_rotate_at || "—";
+      $("shmMsg").textContent = (st.shm && st.shm.message) || "—";
+      $("err").textContent = st.error || "";
+      $("prefix").disabled = running;
+      $("period").disabled = running;
+      $("outdir").disabled = running;
+      $("btnStart").disabled = running;
+      $("btnStop").disabled = !running;
+      if (!running) {
+        if (st.prefix) $("prefix").value = st.prefix;
+        if (st.output_dir) $("outdir").value = st.output_dir;
+        if (st.period_hours) $("period").value = st.period_hours;
+      }
+      const files = st.files || [];
+      $("files").innerHTML = files.length
+        ? files.map((f) => `<div>${f}</div>`).join("")
+        : "<div>暂无文件</div>";
+    }
+
+    async function refresh() {
+      try {
+        const st = await api("/api/status");
+        render(st);
+      } catch (e) {
+        $("err").textContent = String(e.message || e);
+      }
+    }
+
+    $("btnStart").onclick = async () => {
+      $("ok").textContent = "";
+      $("err").textContent = "";
+      try {
+        const st = await api("/api/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prefix: $("prefix").value.trim() || "imu",
+            output_dir: $("outdir").value.trim() || "/data/imu",
+            period_hours: Number($("period").value) || 6,
+          }),
+        });
+        $("ok").textContent = "已开始录制";
+        render(st);
+      } catch (e) {
+        $("err").textContent = String(e.message || e);
+      }
+    };
+
+    $("btnStop").onclick = async () => {
+      $("ok").textContent = "";
+      $("err").textContent = "";
+      try {
+        const st = await api("/api/stop", { method: "POST" });
+        $("ok").textContent = "已停止";
+        render(st);
+      } catch (e) {
+        $("err").textContent = String(e.message || e);
+      }
+    };
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>
