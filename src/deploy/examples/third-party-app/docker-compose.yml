@@ -1,0 +1,20 @@
+# =============================================================================
+# 第三方程序接入示例：在自己的仓库/目录里写一个 compose，extends 公共模板即可。
+# 只需保证：同一台机器上 zenohd 已运行（docker-compose.core.yml 或原生 systemd）。
+#   cd src/deploy/examples/third-party-app && docker compose up -d --build
+# =============================================================================
+services:
+  my-detector:
+    extends: { file: ../../common.yml, service: sensorhub-base }
+    build:
+      context: ../../..
+      dockerfile: sub_client/sub-template-python/Dockerfile
+      # AI 程序：换成自己的 CUDA/TensorRT 镜像，Dockerfile 只叠加 sensorhub SDK
+      args: { BASE_IMAGE: "python:3.12-slim" }
+    image: my-detector:dev
+    command: ["--mode", "latest", "--keys", "rig/camera/cam_corner_0/image", "--name", "my_detector"]
+    # GPU 示例
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]

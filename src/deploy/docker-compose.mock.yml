@@ -1,0 +1,37 @@
+# =============================================================================
+# 无硬件演示：mock 全部传感器 + Foxglove 低频预览 + sub 示例
+#   docker compose -f docker-compose.core.yml -f docker-compose.mock.yml up -d --build
+#   Foxglove Studio -> Open connection -> ws://<server>:8765
+# =============================================================================
+services:
+  pub-mock:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    image: sensorhub-pub-mock:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: pub_server/pub-mock/Dockerfile
+      args: { PIP_INDEX_URL: "${PIP_INDEX_URL:-https://pypi.org/simple}" }
+    container_name: sensorhub-pub-mock
+    command: ["--slow-link", "cam_side_1"]
+
+  foxglove-preview:
+    extends: { file: common.yml, service: sensorhub-base }
+    image: sensorhub-foxglove-preview:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: sub_client/sub-foxglove-preview/Dockerfile
+      args:
+        BASE_IMAGE: ${FOXGLOVE_IMAGE:-registry.us-west-1.aliyuncs.com/waytous_docker/0-tmp-image:client-foxglove-v7.1.0-x64}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    container_name: sensorhub-foxglove-preview
+    command: ["--hz", "${PREVIEW_HZ:-1}", "--port", "${FOXGLOVE_PORT:-8765}"]
+
+  sub-example:
+    extends: { file: common.yml, service: sensorhub-base }
+    image: sensorhub-sub-example:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: sub_client/sub-template-python/Dockerfile
+      args: { PIP_INDEX_URL: "${PIP_INDEX_URL:-https://pypi.org/simple}" }
+    container_name: sensorhub-sub-example
+    command: ["--mode", "sync", "--keys", "rig/camera/*/image,rig/lidar/*/points", "--base-hz", "10"]

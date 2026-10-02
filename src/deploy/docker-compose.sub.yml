@@ -1,0 +1,37 @@
+# =============================================================================
+# 消费端（sub）。可与 pub 在同一台机器，也可在另一台服务器（ZENOH_CONNECT 仍指向本机 zenohd，
+# 由本机 zenohd 与对端路由器互联）。
+#   docker compose -f docker-compose.core.yml -f docker-compose.sub.yml --profile preview up -d
+# =============================================================================
+services:
+  foxglove-preview:
+    extends: { file: common.yml, service: sensorhub-base }
+    profiles: [preview, all]
+    image: sensorhub-foxglove-preview:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: sub_client/sub-foxglove-preview/Dockerfile
+      args: { BASE_IMAGE: "${FOXGLOVE_IMAGE}" }
+    container_name: sensorhub-foxglove-preview
+    command: ["--hz", "${PREVIEW_HZ:-1}", "--port", "${FOXGLOVE_PORT:-8765}"]
+
+  sub-mcap-recorder:
+    extends: { file: common.yml, service: sensorhub-base }
+    profiles: [record, all]
+    image: sensorhub-sub-mcap-recorder:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: sub_client/sub-mcap-recorder/Dockerfile
+      args: { BASE_IMAGE: "${MCAP_IMAGE}" }
+    container_name: sensorhub-sub-mcap-recorder
+    volumes:
+      - ${RECORD_DIR:-/data/records}:/data/records
+
+  sub-imu-record:
+    extends: { file: common.yml, service: sensorhub-base }
+    profiles: [record, all]
+    image: sensorhub-sub-imu-record:${SENSORHUB_TAG:-dev}
+    build: { context: .., dockerfile: sub_client/sub-imu-record/Dockerfile }
+    container_name: sensorhub-sub-imu-record
+    volumes:
+      - ${RECORD_DIR:-/data/records}:/data/records

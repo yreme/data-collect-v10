@@ -1,0 +1,64 @@
+# =============================================================================
+# 真实硬件采集（pub）。各服务由 tasks/ 下对应任务实现，按 profile 逐个启用：
+#   docker compose -f docker-compose.core.yml -f docker-compose.pub.yml --profile camera --profile lidar up -d
+#   docker compose ... --profile all up -d
+#
+# 每个传感器只能被一个进程占用 —— 同一台服务器上同一 profile 只启动一次；
+# 服务器 A / D 各自采集接在自己网口上的设备（通过 sensors.yaml 的 host 字段/ --host 过滤）。
+# =============================================================================
+services:
+  sync-master:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    profiles: [sync, all]
+    image: sensorhub-sync-master:${SENSORHUB_TAG:-dev}
+    build: { context: .., dockerfile: pub_server/sync-master/Dockerfile }
+    container_name: sensorhub-sync-master
+
+  pub-camera-gige:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    profiles: [camera, all]
+    image: sensorhub-pub-camera-gige:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: pub_server/pub-camera-gige/Dockerfile
+      args: { BASE_IMAGE: "${GIGE_IMAGE}" }
+    container_name: sensorhub-pub-camera-gige
+    # 实时线程优先级 + 绑核示例（按实际 CPU 拓扑调整，避开网卡中断所在核）
+    # cpuset: "2-5"
+    ulimits: { rtprio: 99 }
+
+  pub-lidar-rs:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    profiles: [lidar, all]
+    image: sensorhub-pub-lidar-rs:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: pub_server/pub-lidar-rs/Dockerfile
+      args: { BASE_IMAGE: "${LIDAR_IMAGE}" }
+    container_name: sensorhub-pub-lidar-rs
+
+  pub-imu:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    profiles: [imu, all]
+    image: sensorhub-pub-imu:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: pub_server/pub-imu/Dockerfile
+      args: { BASE_IMAGE: "${IMU_IMAGE}" }
+    container_name: sensorhub-pub-imu
+    devices:
+      - ${IMU_DEVICE:-/dev/ttyUSB0}:${IMU_DEVICE:-/dev/ttyUSB0}
+
+  pub-plc:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    profiles: [plc, all]
+    image: sensorhub-pub-plc:${SENSORHUB_TAG:-dev}
+    build: { context: .., dockerfile: pub_server/pub-plc/Dockerfile }
+    container_name: sensorhub-pub-plc
+
+  netprobe:
+    extends: { file: common.yml, service: sensorhub-pub-base }
+    profiles: [net, all]
+    image: sensorhub-netprobe:${SENSORHUB_TAG:-dev}
+    build: { context: .., dockerfile: pub_server/netprobe/Dockerfile }
+    container_name: sensorhub-netprobe

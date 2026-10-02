@@ -1,0 +1,43 @@
+# =============================================================================
+# 核心：zenohd 路由器 + Web 控制台（每台服务器一份）
+#   cd src/deploy && cp .env.example .env && docker compose -f docker-compose.core.yml up -d
+#   浏览器打开 http://<server>:18100
+# =============================================================================
+name: sensorhub-core
+services:
+  zenohd:
+    image: ${ZENOHD_IMAGE:-eclipse/zenoh:1.10.1}
+    container_name: sensorhub-zenohd
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    ulimits: { memlock: -1, nofile: 65536 }
+    command: ["-c", "/etc/zenoh/zenohd.json5"]
+    environment:
+      RUST_LOG: ${ZENOH_LOG:-info}
+    volumes:
+      - ../broker/config/${ZENOHD_CONFIG:-zenohd.json5}:/etc/zenoh/zenohd.json5:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8000/@/*/router >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  console:
+    extends: { file: common.yml, service: sensorhub-base }
+    image: sensorhub-console:${SENSORHUB_TAG:-dev}
+    build:
+      context: ..
+      dockerfile: console/Dockerfile
+      args: { PIP_INDEX_URL: "${PIP_INDEX_URL:-https://pypi.org/simple}" }
+    container_name: sensorhub-console
+    environment:
+      CONSOLE_PORT: ${CONSOLE_PORT:-18100}
+      SENSORHUB_CONFIG_DIR: /app/configs
+      SENSORHUB_CONFIG_FILE: ${SENSORS_CONFIG:-sensors.yaml}
+      SENSORHUB_DATA_DIR: /data/console
+    volumes:
+      # 控制台需要写配置（保存/回滚），因此这里覆盖为 rw；版本历史在 configs/.history
+      - ${SENSORHUB_CONFIG_DIR:-../configs}:/app/configs:rw
+      - ${SENSORHUB_DATA_DIR:-./data}/console:/data/console
+    depends_on: [zenohd]

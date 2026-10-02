@@ -1,0 +1,41 @@
+# =============================================================================
+# sensorhub 公共服务模板 —— 所有 pub/sub 容器都应 extends 这里的 sensorhub-base
+#
+#   services:
+#     my-app:
+#       extends: { file: ../deploy/common.yml, service: sensorhub-base }
+#       image: my-image
+#
+# 这些设置对性能是"必须"而不是"建议"（原因见 docs/06-Docker部署与性能调优.md）：
+#   network_mode: host  —— 无 NAT/veth，本机 peer 之间用 127.0.0.1 直连；跨机直接走宿主机网卡
+#   ipc: host           —— 共享宿主机 /dev/shm，Zenoh SHM 段可在容器之间零拷贝映射
+#   memlock: -1         —— Zenoh SHM 需要 mlock；默认 8MB 时 SDK 会自动关闭 SHM（退化为 TCP 拷贝）
+# =============================================================================
+services:
+  sensorhub-base:
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    init: true
+    ulimits:
+      memlock: -1
+      nofile: 65536
+    environment:
+      ZENOH_MODE: ${ZENOH_MODE:-peer}
+      ZENOH_CONNECT: ${ZENOH_CONNECT:-tcp/127.0.0.1:7447}
+      ZENOH_SHM: ${ZENOH_SHM:-1}
+      SENSORHUB_PREFIX: ${SENSORHUB_PREFIX:-rig}
+      SENSORHUB_CONFIG: /app/configs/${SENSORS_CONFIG:-sensors.yaml}
+      TZ: ${TZ:-Asia/Shanghai}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ${SENSORHUB_CONFIG_DIR:-../configs}:/app/configs:ro
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "3" }
+
+  # 采集类（pub）：需要实时调度 + 大 socket 缓冲；可通过 cpuset 绑核
+  sensorhub-pub-base:
+    extends: { service: sensorhub-base }
+    cap_add: [SYS_NICE, NET_RAW, NET_ADMIN]
+    stop_grace_period: 5s
