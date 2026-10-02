@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+.pytest_cache/
+deploy/.env
+deploy/data/
+configs/.history/
+console/data/
