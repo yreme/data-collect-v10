@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sensorhub 控制台</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header>
+  <div class="brand">sensorhub <span id="prefix" class="pill"></span></div>
+  <nav>
+    <button data-tab="overview" class="active">总览</button>
+    <button data-tab="control">传感器控制</button>
+    <button data-tab="config">配置管理</button>
+    <button data-tab="network">网络链路</button>
+    <button data-tab="events">事件</button>
+    <button data-tab="system">系统</button>
+  </nav>
+  <div id="conn" class="muted"></div>
+</header>
+
+<main>
+  <!-- 总览 -->
+  <section id="tab-overview" class="tab active">
+    <div class="cards" id="summary"></div>
+    <h3>实例 <small class="muted">（点击别名/备注可编辑，保存后持久化，重启仍保留）</small></h3>
+    <table id="nodes"><thead><tr>
+      <th>状态</th><th>别名</th><th>备注</th><th>类型</th><th>名称</th><th>主机</th><th>链路</th><th>SHM</th><th>最近心跳</th><th></th>
+    </tr></thead><tbody></tbody></table>
+    <h3>数据通道 <small class="muted">（频率/带宽/延迟来自发布端 status，控制台不拉取原始数据）</small></h3>
+    <table id="streams"><thead><tr>
+      <th>别名</th><th>Key</th><th>编码</th><th>频率 实际/目标</th><th>帧大小</th><th>带宽</th>
+      <th>延迟 p50/max</th><th>同步误差 p95</th><th>丢帧</th><th>计数</th><th></th>
+    </tr></thead><tbody></tbody></table>
+    <div id="probe-result" class="panel hidden"></div>
+  </section>
+
+  <!-- 控制 -->
+  <section id="tab-control" class="tab">
+    <div class="row">
+      <label>实例 <select id="ctrl-node"></select></label>
+      <button id="ctrl-load">读取参数</button>
+      <span class="muted">参数表单由设备的 describe 自动生成；标记 ⟳ 的参数需重启生效。</span>
+    </div>
+    <form id="ctrl-form" class="grid-form"></form>
+    <div class="row"><button id="ctrl-apply" class="primary">应用修改</button><span id="ctrl-ops"></span></div>
+    <pre id="ctrl-result" class="panel"></pre>
+  </section>
+
+  <!-- 配置 -->
+  <section id="tab-config" class="tab">
+    <div class="split">
+      <div class="left">
+        <div class="row">
+          <b>sensors.yaml</b> <span id="cfg-ver" class="pill"></span>
+          <button id="cfg-reload">重新加载</button>
+          <button id="cfg-validate">校验</button>
+          <input id="cfg-comment" placeholder="修改说明（必填）" />
+          <button id="cfg-save" class="primary">保存为新版本</button>
+        </div>
+        <textarea id="cfg-text" spellcheck="false"></textarea>
+        <pre id="cfg-msg" class="panel"></pre>
+      </div>
+      <div class="right">
+        <h3>历史版本</h3>
+        <table id="cfg-hist"><thead><tr><th>版本</th><th>时间</th><th>说明</th><th>标签</th><th></th></tr></thead><tbody></tbody></table>
+        <pre id="cfg-diff" class="panel diff"></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- 网络 -->
+  <section id="tab-network" class="tab">
+    <p class="muted">链路协商速率来源：① 采集进程用已打开的相机句柄读取 GevLinkSpeed（不抢占控制权）；
+      ② netprobe：被动 GVCP 发现 + ICMP RTT + 交换机 SNMP（ifHighSpeed）。</p>
+    <table id="net"><thead><tr>
+      <th>设备</th><th>别名</th><th>IP</th><th>MAC</th><th>协商速率</th><th>RTT</th><th>来源</th><th>状态</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <!-- 事件 -->
+  <section id="tab-events" class="tab">
+    <table id="events"><thead><tr><th>时间</th><th>级别</th><th>实例</th><th>消息</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <!-- 系统 -->
+  <section id="tab-system" class="tab">
+    <h3>Zenoh 路由器</h3>
+    <pre id="router" class="panel"></pre>
+  </section>
+</main>
+
+<dialog id="alias-dlg">
+  <form method="dialog">
+    <h3 id="alias-title"></h3>
+    <label>别名 <input id="alias-in" /></label>
+    <label>位置 <input id="loc-in" placeholder="如：吊具左上" /></label>
+    <label>备注 <textarea id="note-in" rows="3"></textarea></label>
+    <div class="row"><button value="cancel">取消</button><button id="alias-save" value="ok" class="primary">保存</button></div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
